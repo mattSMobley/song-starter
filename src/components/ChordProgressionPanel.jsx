@@ -119,7 +119,7 @@ export default function ChordProgressionPanel({ root, scale, bpm }) {
 
       {/* Cards grid */}
       <div className="flex-1 overflow-y-auto">
-        <div className="grid grid-cols-2 gap-4 pb-4" style={{ gridAutoRows: 'min-content' }}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-4" style={{ gridAutoRows: 'min-content' }}>
           {progressions.map((prog, pi) => {
             const isPlaying = playingIdx === pi
             return (

@@ -34,6 +34,7 @@ export default function Piano({
   highlightNotes = [],
   onNoteOn,
   onNoteOff,
+  compact = false,
 }) {
   const [activeNotes, setActiveNotes] = useState(new Set())
   const heldKeys = new Set()
@@ -76,15 +77,15 @@ export default function Piano({
   }, [keyboardMode, activate, deactivate])
 
   const { whites, blacks } = buildKeys(octaveStart, numOctaves)
-  const WHITE_W = 42
-  const WHITE_H = 150
-  const BLACK_W = 26
-  const BLACK_H = 94
+  const WHITE_W = compact ? 30 : 42
+  const WHITE_H = compact ? 110 : 150
+  const BLACK_W = compact ? 19 : 26
+  const BLACK_H = compact ? 68 : 94
   const totalW = whites.length * WHITE_W
 
   return (
     <div className="flex flex-col items-center gap-2">
-      {keyboardMode && (
+      {keyboardMode && !compact && (
         <div className="flex items-center gap-2 text-xs"
           style={{ color: 'rgba(168,85,247,0.7)' }}>
           <span className="w-1.5 h-1.5 rounded-full inline-block"

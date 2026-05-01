@@ -38,7 +38,7 @@ export default function BrowseTab({ bpm, onSave }) {
       </div>
 
       {/* Category filter */}
-      <div className="flex flex-wrap gap-2 flex-shrink-0">
+      <div className="flex gap-2 flex-shrink-0 overflow-x-auto pb-1" style={{ flexWrap: 'nowrap' }}>
         {CATEGORIES.map(c => {
           const on = cat === c
           return (
@@ -67,7 +67,7 @@ export default function BrowseTab({ bpm, onSave }) {
 
       {/* Grid */}
       <div className="flex-1 overflow-y-auto">
-        <div className="grid grid-cols-2 gap-4 pb-4" style={{ gridAutoRows: 'min-content' }}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-4" style={{ gridAutoRows: 'min-content' }}>
           {visible.map((loop, i) =>
             loop.isDrum
               ? <DrumCard key={loop.id} loop={loop} index={i} bpm={bpm} />

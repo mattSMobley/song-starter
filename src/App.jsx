@@ -37,10 +37,18 @@ export default function App() {
   const [midiCh, setMidiCh] = useState(1)
   const [midiReady, setMidiReady] = useState(false)
   const [activeNotes, setActiveNotes] = useState(new Set())
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [playAllIdx, setPlayAllIdx] = useState(-1)
   const playAllRef = useRef(false)
   const playAllPartRef = useRef(null)
   const recorderRef = useRef(null)
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768)
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
 
   useEffect(() => {
     initMidi().then(({ ok }) => {
@@ -393,13 +401,26 @@ export default function App() {
           boxShadow: '0 1px 0 rgba(124,58,237,0.3), 0 0 50px rgba(0,0,0,0.6), 0 4px 24px rgba(124,58,237,0.06)',
         }}>
 
+        {/* Hamburger — mobile only */}
+        {isMobile && (
+          <button onClick={() => setSidebarOpen(o => !o)}
+            className="flex items-center justify-center flex-shrink-0"
+            style={{ width: 44, height: 44, marginLeft: 12, color: '#c084fc' }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <line x1="3" y1="6" x2="21" y2="6"/>
+              <line x1="3" y1="12" x2="21" y2="12"/>
+              <line x1="3" y1="18" x2="21" y2="18"/>
+            </svg>
+          </button>
+        )}
+
         {/* Logo — sits directly over the sidebar column */}
         <div className="flex items-center gap-3 flex-shrink-0"
           style={{
-            width: 280,
-            paddingLeft: 28,
+            width: isMobile ? 'auto' : 280,
+            paddingLeft: isMobile ? 8 : 28,
             paddingRight: 20,
-            borderRight: '1px solid rgba(124,58,237,0.12)',
+            borderRight: isMobile ? 'none' : '1px solid rgba(124,58,237,0.12)',
             height: '100%',
           }}>
           <div className="relative flex items-center justify-center" style={{ width: 34, height: 34 }}>
@@ -426,12 +447,15 @@ export default function App() {
           </span>
         </div>
 
-        {/* Visualizer — centered in the content column */}
-        <div className="flex-1 flex items-center justify-center">
-          <div style={{ width: '100%', maxWidth: 480 }}>
-            <Visualizer />
+        {/* Visualizer — hidden on mobile */}
+        {!isMobile && (
+          <div className="flex-1 flex items-center justify-center">
+            <div style={{ width: '100%', maxWidth: 480 }}>
+              <Visualizer />
+            </div>
           </div>
-        </div>
+        )}
+        {isMobile && <div className="flex-1" />}
 
         {/* BPM */}
         <div className="flex items-center gap-2.5 rounded-xl flex-shrink-0"
@@ -455,7 +479,14 @@ export default function App() {
       {/* ── Body ────────────────────────────────────────────────────────── */}
       <div className="flex flex-1 overflow-hidden">
 
-        {/* ── Sidebar ─────────────────────────────────────────────────── */}
+        {/* ── Mobile sidebar backdrop ──────────────────────────────────── */}
+        {isMobile && sidebarOpen && (
+          <div onClick={() => setSidebarOpen(false)}
+            className="fixed inset-0 z-40"
+            style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)' }} />
+        )}
+
+      {/* ── Sidebar ─────────────────────────────────────────────────── */}
         <aside className="flex flex-col gap-5 flex-shrink-0 overflow-y-auto"
           style={{
             padding: '24px 28px',
@@ -463,6 +494,11 @@ export default function App() {
             background: 'linear-gradient(180deg, rgba(14,8,32,0.98) 0%, rgba(8,5,18,0.97) 60%, rgba(6,4,14,0.96) 100%)',
             borderRight: '1px solid rgba(124,58,237,0.18)',
             boxShadow: 'inset -1px 0 0 rgba(124,58,237,0.12), 4px 0 32px rgba(0,0,0,0.5)',
+            ...(isMobile ? {
+              position: 'fixed', top: 0, left: 0, bottom: 0, zIndex: 50,
+              transform: sidebarOpen ? 'translateX(0)' : 'translateX(-100%)',
+              transition: 'transform 0.25s cubic-bezier(0.4,0,0.2,1)',
+            } : {}),
           }}>
 
           {/* Instruments */}
@@ -644,108 +680,142 @@ export default function App() {
         <main className="flex-1 flex flex-col overflow-hidden">
 
           {/* Piano zone */}
-          <div className="flex-shrink-0 flex items-center"
+          <div className="flex-shrink-0"
             style={{
-              padding: '16px 28px 16px 32px',
-              gap: 20,
+              padding: isMobile ? '12px 16px' : '16px 28px 16px 32px',
               overflow: 'hidden',
               background: 'linear-gradient(180deg, rgba(16,8,36,0.88) 0%, rgba(8,5,18,0.72) 60%, rgba(6,4,14,0.5) 100%)',
               borderBottom: '1px solid rgba(124,58,237,0.22)',
               boxShadow: '0 8px 40px rgba(0,0,0,0.5), inset 0 1px 0 rgba(124,58,237,0.14), 0 0 50px rgba(124,58,237,0.05)',
             }}>
 
-            {/* Chord display — fills the space that was formerly a marginLeft offset */}
-            <div className="flex-shrink-0 flex items-center justify-center" style={{ width: 195 }}>
-              <ChordDisplay activeNotes={activeNotes} />
-            </div>
-
-            <div className="flex-shrink-0">
-              <Piano
-                octaveStart={octave} numOctaves={2} keyboardMode={keyboardMode}
-                onNoteOn={note => {
-                  recorderRef.current?.noteOn(note)
-                  setActiveNotes(prev => new Set([...prev, note]))
-                }}
-                onNoteOff={note => {
-                  recorderRef.current?.noteOff(note)
-                  setActiveNotes(prev => { const s = new Set(prev); s.delete(note); return s })
-                }}
-              />
-            </div>
-
-            <div className="flex-1" />
-
-            {/* Right panel: keyboard toggle + variation stops */}
-            <div className="flex flex-col items-stretch gap-2.5 flex-shrink-0" style={{ width: 112 }}>
-              {/* Keyboard toggle */}
-              <button
-                onClick={() => setKeyboardMode(m => !m)}
-                className="flex items-center justify-center gap-1.5 rounded-xl font-semibold transition-all"
-                style={{
-                  padding: '8px 10px',
-                  fontSize: '0.72rem',
-                  background: keyboardMode
-                    ? 'linear-gradient(135deg, rgba(124,58,237,0.38) 0%, rgba(109,40,217,0.22) 100%)'
-                    : 'rgba(255,255,255,0.03)',
-                  border: keyboardMode ? '1px solid rgba(168,85,247,0.6)' : '1px solid rgba(255,255,255,0.07)',
-                  color: keyboardMode ? '#e9d5ff' : 'rgba(148,163,184,0.4)',
-                  boxShadow: keyboardMode ? '0 0 16px rgba(124,58,237,0.4)' : 'none',
-                  letterSpacing: '0.04em',
-                  textShadow: keyboardMode ? '0 0 10px rgba(168,85,247,0.9)' : 'none',
-                }}>
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <rect x="2" y="7" width="20" height="14" rx="2"/>
-                  <path d="M6 7V4"/><path d="M18 7V4"/>
-                </svg>
-                Keys {keyboardMode ? 'ON' : 'OFF'}
-              </button>
-
-              {/* Divider */}
-              <div style={{ height: 1, background: 'rgba(124,58,237,0.18)', margin: '0 4px' }} />
-
-              {/* Sampler loading indicator */}
-              {samplerLoading && (
-                <div className="flex items-center gap-1.5 justify-center" style={{ padding: '4px 0' }}>
-                  <div className="w-1.5 h-1.5 rounded-full" style={{ background: '#22d3ee', animation: 'pulse 1s ease-in-out infinite' }} />
-                  <span style={{ fontSize: '0.62rem', color: '#22d3ee', letterSpacing: '0.08em' }}>loading…</span>
+            {isMobile ? (
+              /* ── Mobile piano zone ── */
+              <div className="flex flex-col gap-2 items-center">
+                {/* Compact piano + chord display side by side */}
+                <div className="flex items-center justify-center gap-3">
+                  <ChordDisplay activeNotes={activeNotes} />
+                  <Piano
+                    compact octaveStart={octave} numOctaves={1} keyboardMode={false}
+                    onNoteOn={note => {
+                      recorderRef.current?.noteOn(note)
+                      setActiveNotes(prev => new Set([...prev, note]))
+                    }}
+                    onNoteOff={note => {
+                      recorderRef.current?.noteOff(note)
+                      setActiveNotes(prev => { const s = new Set(prev); s.delete(note); return s })
+                    }}
+                  />
                 </div>
-              )}
+                {/* Variation pills — horizontal scroll */}
+                <div className="flex gap-2 overflow-x-auto w-full" style={{ paddingBottom: 2 }}>
+                  {(() => {
+                    const inst = INSTRUMENTS.find(i => i.id === instrument)
+                    return inst?.variations.map((v, idx) => {
+                      const on = variation === idx
+                      return (
+                        <button key={idx} onClick={() => handleVariationChange(idx)}
+                          className="rounded-lg font-semibold flex-shrink-0 transition-all"
+                          style={{
+                            padding: '6px 12px', fontSize: '0.7rem',
+                            background: on ? 'linear-gradient(135deg, rgba(124,58,237,0.45), rgba(109,40,217,0.28))' : 'rgba(255,255,255,0.04)',
+                            border: on ? '1px solid rgba(168,85,247,0.55)' : '1px solid rgba(255,255,255,0.07)',
+                            color: on ? '#f0e0ff' : 'rgba(148,163,184,0.5)',
+                            boxShadow: on ? '0 0 10px rgba(124,58,237,0.3)' : 'none',
+                          }}>
+                          {v}
+                        </button>
+                      )
+                    })
+                  })()}
+                </div>
+              </div>
+            ) : (
+              /* ── Desktop piano zone ── */
+              <div className="flex items-center" style={{ gap: 20 }}>
+                {/* Chord display */}
+                <div className="flex-shrink-0 flex items-center justify-center" style={{ width: 195 }}>
+                  <ChordDisplay activeNotes={activeNotes} />
+                </div>
 
-              {/* Variation stops */}
-              {(() => {
-                const inst = INSTRUMENTS.find(i => i.id === instrument)
-                return inst?.variations.map((v, idx) => {
-                  const on = variation === idx
-                  return (
-                    <button key={idx} onClick={() => handleVariationChange(idx)}
-                      className="rounded-lg font-semibold transition-all"
-                      style={{
-                        padding: '7px 10px',
-                        fontSize: '0.72rem',
-                        letterSpacing: '0.03em',
-                        textAlign: 'left',
-                        background: on
-                          ? 'linear-gradient(135deg, rgba(124,58,237,0.45), rgba(109,40,217,0.28))'
-                          : 'rgba(255,255,255,0.03)',
-                        border: on ? '1px solid rgba(168,85,247,0.55)' : '1px solid rgba(255,255,255,0.06)',
-                        color: on ? '#f0e0ff' : 'rgba(148,163,184,0.5)',
-                        boxShadow: on ? '0 0 12px rgba(124,58,237,0.35), inset 0 1px 0 rgba(255,255,255,0.06)' : 'none',
-                        textShadow: on ? '0 0 8px rgba(168,85,247,0.7)' : 'none',
-                      }}>
-                      <span style={{ opacity: 0.5, marginRight: 5, fontSize: '0.65rem' }}>{idx + 1}</span>
-                      {v}
-                    </button>
-                  )
-                })
-              })()}
-            </div>
+                <div className="flex-shrink-0">
+                  <Piano
+                    octaveStart={octave} numOctaves={2} keyboardMode={keyboardMode}
+                    onNoteOn={note => {
+                      recorderRef.current?.noteOn(note)
+                      setActiveNotes(prev => new Set([...prev, note]))
+                    }}
+                    onNoteOff={note => {
+                      recorderRef.current?.noteOff(note)
+                      setActiveNotes(prev => { const s = new Set(prev); s.delete(note); return s })
+                    }}
+                  />
+                </div>
+
+                <div className="flex-1" />
+
+                {/* Right panel: keyboard toggle + variation stops */}
+                <div className="flex flex-col items-stretch gap-2.5 flex-shrink-0" style={{ width: 112 }}>
+                  <button
+                    onClick={() => setKeyboardMode(m => !m)}
+                    className="flex items-center justify-center gap-1.5 rounded-xl font-semibold transition-all"
+                    style={{
+                      padding: '8px 10px', fontSize: '0.72rem',
+                      background: keyboardMode ? 'linear-gradient(135deg, rgba(124,58,237,0.38) 0%, rgba(109,40,217,0.22) 100%)' : 'rgba(255,255,255,0.03)',
+                      border: keyboardMode ? '1px solid rgba(168,85,247,0.6)' : '1px solid rgba(255,255,255,0.07)',
+                      color: keyboardMode ? '#e9d5ff' : 'rgba(148,163,184,0.4)',
+                      boxShadow: keyboardMode ? '0 0 16px rgba(124,58,237,0.4)' : 'none',
+                      letterSpacing: '0.04em',
+                      textShadow: keyboardMode ? '0 0 10px rgba(168,85,247,0.9)' : 'none',
+                    }}>
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect x="2" y="7" width="20" height="14" rx="2"/>
+                      <path d="M6 7V4"/><path d="M18 7V4"/>
+                    </svg>
+                    Keys {keyboardMode ? 'ON' : 'OFF'}
+                  </button>
+
+                  <div style={{ height: 1, background: 'rgba(124,58,237,0.18)', margin: '0 4px' }} />
+
+                  {samplerLoading && (
+                    <div className="flex items-center gap-1.5 justify-center" style={{ padding: '4px 0' }}>
+                      <div className="w-1.5 h-1.5 rounded-full" style={{ background: '#22d3ee', animation: 'pulse 1s ease-in-out infinite' }} />
+                      <span style={{ fontSize: '0.62rem', color: '#22d3ee', letterSpacing: '0.08em' }}>loading…</span>
+                    </div>
+                  )}
+
+                  {(() => {
+                    const inst = INSTRUMENTS.find(i => i.id === instrument)
+                    return inst?.variations.map((v, idx) => {
+                      const on = variation === idx
+                      return (
+                        <button key={idx} onClick={() => handleVariationChange(idx)}
+                          className="rounded-lg font-semibold transition-all"
+                          style={{
+                            padding: '7px 10px', fontSize: '0.72rem', letterSpacing: '0.03em', textAlign: 'left',
+                            background: on ? 'linear-gradient(135deg, rgba(124,58,237,0.45), rgba(109,40,217,0.28))' : 'rgba(255,255,255,0.03)',
+                            border: on ? '1px solid rgba(168,85,247,0.55)' : '1px solid rgba(255,255,255,0.06)',
+                            color: on ? '#f0e0ff' : 'rgba(148,163,184,0.5)',
+                            boxShadow: on ? '0 0 12px rgba(124,58,237,0.35), inset 0 1px 0 rgba(255,255,255,0.06)' : 'none',
+                            textShadow: on ? '0 0 8px rgba(168,85,247,0.7)' : 'none',
+                          }}>
+                          <span style={{ opacity: 0.5, marginRight: 5, fontSize: '0.65rem' }}>{idx + 1}</span>
+                          {v}
+                        </button>
+                      )
+                    })
+                  })()}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Tab area */}
           <div className="flex-1 flex flex-col overflow-hidden gap-4" style={{ padding: '20px 32px' }}>
 
             {/* Tab bar */}
-            <div className="flex items-center gap-1 flex-shrink-0"
+            <div className="overflow-x-auto flex-shrink-0" style={{ maxWidth: '100%' }}>
+            <div className="flex items-center gap-1"
               style={{
                 background: 'rgba(10,5,22,0.85)',
                 border: '1px solid rgba(124,58,237,0.2)',
@@ -775,6 +845,7 @@ export default function App() {
                   </button>
                 )
               })}
+            </div>
             </div>
 
             {/* Tab content */}
@@ -891,7 +962,7 @@ export default function App() {
                     </div>
                   </div>
                   <div className="flex-1 overflow-y-auto">
-                    <div className="grid grid-cols-2 gap-4 pb-4" style={{ gridAutoRows: 'min-content' }}>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-4" style={{ gridAutoRows: 'min-content' }}>
                       {melodies.map((melody, i) => (
                         <MelodyCard key={i} melody={melody} index={i} bpm={bpm} onSave={handleSaveMelody}
                           isPlaying={playAllIdx === i} />
