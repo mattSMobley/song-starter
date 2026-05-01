@@ -1,4 +1,5 @@
-import { useEffect, useCallback, useState } from 'react'
+import { useEffect, useCallback, useState, useRef } from 'react'
+import * as Tone from 'tone'
 import { noteOn, noteOff } from '../audio/engine.js'
 
 const KEY_MAP = {
@@ -38,8 +39,11 @@ export default function Piano({
 }) {
   const [activeNotes, setActiveNotes] = useState(new Set())
   const heldKeys = new Set()
+  const touchNoteRef = useRef(null)
 
-  const activate = useCallback((note) => {
+  // Ensure AudioContext is running before every note — critical on mobile
+  const activate = useCallback(async (note) => {
+    await Tone.start()
     setActiveNotes(prev => new Set([...prev, note]))
     noteOn(note)
     onNoteOn?.(note)
@@ -76,6 +80,36 @@ export default function Piano({
     }
   }, [keyboardMode, activate, deactivate])
 
+  // ── Touch helpers: all handled on the container so swipe works ──────────
+  function noteFromPoint(x, y) {
+    const el = document.elementFromPoint(x, y)
+    return el?.closest('[data-note]')?.dataset.note ?? null
+  }
+
+  function handleTouchStart(e) {
+    e.preventDefault()
+    const note = noteFromPoint(e.touches[0].clientX, e.touches[0].clientY)
+    if (note) { touchNoteRef.current = note; activate(note) }
+  }
+
+  function handleTouchMove(e) {
+    e.preventDefault()
+    const note = noteFromPoint(e.touches[0].clientX, e.touches[0].clientY)
+    if (note && note !== touchNoteRef.current) {
+      if (touchNoteRef.current) deactivate(touchNoteRef.current)
+      touchNoteRef.current = note
+      activate(note)
+    }
+  }
+
+  function handleTouchEnd(e) {
+    e.preventDefault()
+    if (touchNoteRef.current) {
+      deactivate(touchNoteRef.current)
+      touchNoteRef.current = null
+    }
+  }
+
   const { whites, blacks } = buildKeys(octaveStart, numOctaves)
   const WHITE_W = compact ? 30 : 42
   const WHITE_H = compact ? 110 : 150
@@ -102,7 +136,11 @@ export default function Piano({
           border: '2px solid rgba(124,58,237,0.25)',
           boxShadow: '0 8px 40px rgba(0,0,0,0.6), 0 0 30px rgba(124,58,237,0.08)',
           padding: '10px 0 0',
+          touchAction: 'none',
         }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
       >
         {whites.map(({ note, whiteIdx }) => {
           const isActive = activeNotes.has(note)
@@ -110,6 +148,7 @@ export default function Piano({
           return (
             <div
               key={note}
+              data-note={note}
               className={`key-white ${isActive ? 'active' : ''}`}
               style={{
                 position: 'absolute',
@@ -122,8 +161,6 @@ export default function Piano({
               onMouseDown={() => activate(note)}
               onMouseUp={() => deactivate(note)}
               onMouseLeave={() => { if (activeNotes.has(note)) deactivate(note) }}
-              onTouchStart={(e) => { e.preventDefault(); activate(note) }}
-              onTouchEnd={(e) => { e.preventDefault(); deactivate(note) }}
             >
               <span className="absolute bottom-2 left-0 right-0 text-center font-mono"
                 style={{
@@ -141,6 +178,7 @@ export default function Piano({
           return (
             <div
               key={note}
+              data-note={note}
               className={`key-black ${isActive ? 'active' : ''}`}
               style={{
                 position: 'absolute',
@@ -152,8 +190,6 @@ export default function Piano({
               onMouseDown={(e) => { e.stopPropagation(); activate(note) }}
               onMouseUp={(e) => { e.stopPropagation(); deactivate(note) }}
               onMouseLeave={() => { if (activeNotes.has(note)) deactivate(note) }}
-              onTouchStart={(e) => { e.preventDefault(); e.stopPropagation(); activate(note) }}
-              onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); deactivate(note) }}
             />
           )
         })}
