@@ -1,0 +1,252 @@
+@import "tailwindcss";
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: #06060c;
+  color: #e2e8f0;
+  font-family: 'Inter', system-ui, sans-serif;
+  overflow: hidden;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: #10101a; }
+::-webkit-scrollbar-thumb { background: #2e2e4a; border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: #7c3aed; }
+
+/* ── Piano keys ───────────────────────────────────────────────────────────── */
+.key-white {
+  background: linear-gradient(180deg, #dde4f0 0%, #b8c4d8 100%);
+  border: 1px solid #3a3a5c;
+  border-radius: 0 0 8px 8px;
+  transition: background 0.04s ease, transform 0.04s ease, box-shadow 0.04s ease;
+  cursor: pointer;
+  position: relative;
+}
+.key-white:hover { background: linear-gradient(180deg, #eef1f8 0%, #ccd4e8 100%); }
+.key-white.active {
+  background: linear-gradient(180deg, #c084fc 0%, #7c3aed 100%);
+  box-shadow: 0 0 18px rgba(124,58,237,0.7), 0 4px 8px rgba(0,0,0,0.4);
+  transform: translateY(2px) scaleY(0.98);
+}
+.key-black {
+  background: linear-gradient(180deg, #1a1a2e 0%, #0d0d1a 100%);
+  border: 1px solid #0a0a14;
+  border-radius: 0 0 5px 5px;
+  transition: background 0.04s ease, transform 0.04s ease, box-shadow 0.04s ease;
+  cursor: pointer;
+  position: absolute;
+  z-index: 10;
+}
+.key-black:hover { background: linear-gradient(180deg, #252545 0%, #14142a 100%); }
+.key-black.active {
+  background: linear-gradient(180deg, #a855f7 0%, #6d28d9 100%);
+  box-shadow: 0 0 14px rgba(168,85,247,0.8);
+  transform: translateY(2px) scaleY(0.97);
+}
+
+/* ── Glow utils ───────────────────────────────────────────────────────────── */
+.glow-purple { box-shadow: 0 0 24px rgba(124,58,237,0.45), 0 0 48px rgba(124,58,237,0.15); }
+.glow-cyan   { box-shadow: 0 0 24px rgba(6,182,212,0.45),  0 0 48px rgba(6,182,212,0.15); }
+.glow-pink   { box-shadow: 0 0 24px rgba(236,72,153,0.45), 0 0 48px rgba(236,72,153,0.15); }
+
+/* ── Grid background ──────────────────────────────────────────────────────── */
+.grid-bg {
+  background-image:
+    linear-gradient(rgba(124,58,237,0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(124,58,237,0.05) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* ── Neon borders ─────────────────────────────────────────────────────────── */
+.neon-border      { border: 1px solid rgba(124,58,237,0.3); box-shadow: inset 0 0 20px rgba(124,58,237,0.05); }
+.neon-border-cyan { border: 1px solid rgba(6,182,212,0.3);  box-shadow: inset 0 0 20px rgba(6,182,212,0.05); }
+.neon-border-pink { border: 1px solid rgba(236,72,153,0.3); box-shadow: inset 0 0 20px rgba(236,72,153,0.05); }
+
+/* ── Splash ───────────────────────────────────────────────────────────────── */
+
+/* Corner bracket decoration */
+.corner {
+  position: absolute;
+  width: 48px;
+  height: 48px;
+  pointer-events: none;
+}
+.corner-tl { top: 28px; left: 28px;
+  border-top: 2px solid rgba(124,58,237,0.7);
+  border-left: 2px solid rgba(124,58,237,0.7);
+  box-shadow: -4px -4px 14px rgba(124,58,237,0.35);
+}
+.corner-tr { top: 28px; right: 28px;
+  border-top: 2px solid rgba(6,182,212,0.7);
+  border-right: 2px solid rgba(6,182,212,0.7);
+  box-shadow: 4px -4px 14px rgba(6,182,212,0.35);
+}
+.corner-bl { bottom: 28px; left: 28px;
+  border-bottom: 2px solid rgba(236,72,153,0.6);
+  border-left: 2px solid rgba(236,72,153,0.6);
+  box-shadow: -4px 4px 14px rgba(236,72,153,0.3);
+}
+.corner-br { bottom: 28px; right: 28px;
+  border-bottom: 2px solid rgba(124,58,237,0.6);
+  border-right: 2px solid rgba(124,58,237,0.6);
+  box-shadow: 4px 4px 14px rgba(124,58,237,0.3);
+}
+
+/* Animated gradient title */
+@keyframes gradient-flow {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.title-gradient {
+  background: linear-gradient(
+    120deg,
+    #e879f9 0%,
+    #c084fc 12%,
+    #818cf8 28%,
+    #38bdf8 42%,
+    #34d399 56%,
+    #818cf8 68%,
+    #c084fc 80%,
+    #f472b6 92%,
+    #e879f9 100%
+  );
+  background-size: 300% 300%;
+  animation: gradient-flow 5s ease infinite;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  filter: drop-shadow(0 0 32px rgba(168,85,247,0.55));
+}
+
+/* Scan line sweep */
+@keyframes scan {
+  0%   { top: -4px; opacity: 0; }
+  5%   { opacity: 1; }
+  95%  { opacity: 0.6; }
+  100% { top: 100%; opacity: 0; }
+}
+.scan-line {
+  position: absolute;
+  left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg,
+    transparent 0%, rgba(124,58,237,0.6) 20%,
+    rgba(168,85,247,0.9) 50%,
+    rgba(6,182,212,0.6) 80%, transparent 100%
+  );
+  box-shadow: 0 0 12px rgba(168,85,247,0.6), 0 0 24px rgba(124,58,237,0.3);
+  pointer-events: none;
+  animation: scan 6s linear infinite;
+  animation-delay: 1s;
+}
+
+/* Floating music notes */
+@keyframes note-float {
+  0%   { transform: translateY(0)   rotate(0deg)   scale(1);   opacity: 0; }
+  8%   { opacity: 1; }
+  85%  { opacity: 0.7; }
+  100% { transform: translateY(-260px) rotate(18deg) scale(0.6); opacity: 0; }
+}
+.music-note {
+  position: absolute;
+  pointer-events: none;
+  font-size: 20px;
+  animation: note-float linear infinite;
+  will-change: transform, opacity;
+}
+
+/* Orbit ring around logo */
+@keyframes orbit-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+@keyframes orbit-spin-r {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(-360deg); }
+}
+
+/* Button: multi-ring breathe */
+@keyframes btn-breathe {
+  0%, 100% {
+    box-shadow:
+      0 0 20px  rgba(124,58,237,0.5),
+      0 0 50px  rgba(124,58,237,0.2),
+      0 0 90px  rgba(124,58,237,0.08),
+      inset 0 1px 0 rgba(255,255,255,0.12);
+  }
+  50% {
+    box-shadow:
+      0 0 40px  rgba(168,85,247,0.85),
+      0 0 90px  rgba(124,58,237,0.45),
+      0 0 160px rgba(124,58,237,0.18),
+      0 0 220px rgba(236,72,153,0.08),
+      inset 0 1px 0 rgba(255,255,255,0.18);
+  }
+}
+.btn-breathe { animation: btn-breathe 2.8s ease-in-out infinite; }
+
+@keyframes ring-out {
+  0%   { transform: scale(1);    opacity: 0.7; }
+  100% { transform: scale(2.0);  opacity: 0;   }
+}
+.btn-ring  {
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  border: 1.5px solid rgba(168,85,247,0.55);
+  animation: ring-out 2.2s ease-out infinite;
+  pointer-events: none;
+}
+.btn-ring-2 { animation-delay: 0.73s; border-color: rgba(6,182,212,0.4); }
+.btn-ring-3 { animation-delay: 1.46s; border-color: rgba(236,72,153,0.35); }
+
+/* Logo halo pulse */
+@keyframes halo-pulse {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50%       { opacity: 0.9; transform: scale(1.08); }
+}
+
+/* Tagline fade-in letters (handled inline via delay) */
+@keyframes char-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Content reveal */
+@keyframes reveal-up {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.reveal-up { animation: reveal-up 0.8s cubic-bezier(0.16,1,0.3,1) forwards; opacity: 0; }
+
+/* Feature pill shimmer */
+@keyframes pill-shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position:  200% center; }
+}
+
+/* ── General animations ───────────────────────────────────────────────────── */
+@keyframes slide-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes pulse-ring {
+  0%   { box-shadow: 0 0 0 0 rgba(124,58,237,0.5); }
+  70%  { box-shadow: 0 0 0 8px rgba(124,58,237,0); }
+  100% { box-shadow: 0 0 0 0 rgba(124,58,237,0); }
+}
+@keyframes bar-idle {
+  0%, 100% { transform: scaleY(0.25); }
+  50%       { transform: scaleY(1); }
+}
+@keyframes path-draw {
+  from { stroke-dashoffset: 200; }
+  to   { stroke-dashoffset: 0; }
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.animate-slide-in   { animation: slide-in 0.25s ease forwards; }
+.animate-pulse-ring { animation: pulse-ring 1.2s cubic-bezier(0.4,0,0.6,1) infinite; }

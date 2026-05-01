@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#1a0836"/>
+      <stop offset="100%" stop-color="#06060c"/>
+    </radialGradient>
+    <linearGradient id="wave1" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#7c3aed"/>
+      <stop offset="50%" stop-color="#a855f7"/>
+      <stop offset="100%" stop-color="#06b6d4"/>
+    </linearGradient>
+    <linearGradient id="wave2" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#06b6d4" stop-opacity="0.7"/>
+      <stop offset="100%" stop-color="#ec4899" stop-opacity="0.7"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="1.5" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="glow2">
+      <feGaussianBlur stdDeviation="2.5" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="64" height="64" rx="14" fill="url(#bg)"/>
+
+  <!-- Subtle grid lines -->
+  <line x1="0" y1="32" x2="64" y2="32" stroke="rgba(124,58,237,0.12)" stroke-width="0.5"/>
+  <line x1="32" y1="0" x2="32" y2="64" stroke="rgba(124,58,237,0.08)" stroke-width="0.5"/>
+
+  <!-- Background glow pulse -->
+  <ellipse cx="32" cy="32" rx="22" ry="10" fill="rgba(124,58,237,0.08)"/>
+
+  <!-- Waveform — main sinusoidal path -->
+  <path d="M4,32 C8,22 12,42 16,32 C20,22 22,18 26,32 C30,46 34,46 38,32 C42,18 44,22 48,32 C52,42 56,22 60,32"
+    fill="none" stroke="url(#wave1)" stroke-width="3" stroke-linecap="round"
+    filter="url(#glow2)"/>
+
+  <!-- Second wave — offset for depth -->
+  <path d="M4,32 C8,26 12,38 16,32 C20,26 22,22 26,32 C30,42 34,42 38,32 C42,22 44,26 48,32 C52,38 56,26 60,32"
+    fill="none" stroke="url(#wave2)" stroke-width="1.2" stroke-linecap="round" opacity="0.5"/>
+
+  <!-- Center dot — pulse node -->
+  <circle cx="32" cy="32" r="3.5" fill="#a855f7" filter="url(#glow2)"/>
+  <circle cx="32" cy="32" r="1.8" fill="#e0aaff"/>
+
+  <!-- Corner accent dots -->
+  <circle cx="4" cy="32" r="1.5" fill="#7c3aed" opacity="0.7"/>
+  <circle cx="60" cy="32" r="1.5" fill="#06b6d4" opacity="0.7"/>
+</svg>
