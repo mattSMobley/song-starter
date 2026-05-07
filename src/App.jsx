@@ -53,9 +53,25 @@ export default function App() {
   }, [])
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [playAllIdx, setPlayAllIdx] = useState(-1)
+  const [octaveMsg, setOctaveMsg] = useState('')
+  const octaveMsgTimer = useRef(null)
   const playAllRef = useRef(false)
   const playAllPartRef = useRef(null)
   const recorderRef = useRef(null)
+
+  const handleOctaveUp = useCallback(() => {
+    setOctave(o => {
+      if (o >= 7) { clearTimeout(octaveMsgTimer.current); setOctaveMsg('Highest octave'); octaveMsgTimer.current = setTimeout(() => setOctaveMsg(''), 1800); return o }
+      return o + 1
+    })
+  }, [])
+
+  const handleOctaveDown = useCallback(() => {
+    setOctave(o => {
+      if (o <= 2) { clearTimeout(octaveMsgTimer.current); setOctaveMsg('Lowest octave'); octaveMsgTimer.current = setTimeout(() => setOctaveMsg(''), 1800); return o }
+      return o - 1
+    })
+  }, [])
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768)
@@ -619,7 +635,7 @@ export default function App() {
           <section>
             <label style={S.sectionLabel}>Octave</label>
             <div className="flex items-center gap-2">
-              {[['−', () => setOctave(o => Math.max(2, o - 1))], ['+', () => setOctave(o => Math.min(7, o + 1))]].map(([label, fn], i) => (
+              {[['−', handleOctaveDown], ['+', handleOctaveUp]].map(([label, fn], i) => (
                 <button key={label} onClick={fn}
                   className="rounded-xl font-bold transition-all flex items-center justify-center"
                   style={{
@@ -638,6 +654,11 @@ export default function App() {
                 {octave}
               </span>
             </div>
+            {octaveMsg && (
+              <p style={{ fontSize: '0.62rem', color: '#22d3ee', textAlign: 'center', marginTop: 6, letterSpacing: '0.06em', opacity: 0.85 }}>
+                {octaveMsg}
+              </p>
+            )}
           </section>
 
           <div style={S.divider} />
@@ -798,6 +819,8 @@ export default function App() {
                       chordNotes={chordHighlights}
                       onNoteOn={handlePianoNoteOn}
                       onNoteOff={handlePianoNoteOff}
+                      onOctaveUp={handleOctaveUp}
+                      onOctaveDown={handleOctaveDown}
                     />
                     <BassPedals
                       octave={octave - 1}

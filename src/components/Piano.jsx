@@ -47,14 +47,14 @@ export default function Piano({
   chordNotes = [],
   onNoteOn,
   onNoteOff,
+  onOctaveUp,
+  onOctaveDown,
   compact = false,
-  clipEnd = null, // e.g. "F5" — trims display to only show mapped keys
+  clipEnd = null,
 }) {
   const [activeNotes, setActiveNotes] = useState(new Set())
-  const heldKeys = useRef(new Map()) // key → note (so keyup always releases the right note)
+  const heldKeys = useRef(new Map()) // key → note
   const touchNoteRef = useRef(null)
-  const shiftRef = useRef(0)
-  const [octaveShift, setOctaveShift] = useState(0) // display only
 
   const activate = useCallback(async (note) => {
     await Tone.start()
@@ -73,44 +73,27 @@ export default function Piano({
     if (!keyboardMode) return
     heldKeys.current.clear()
     setActiveNotes(new Set())
-    shiftRef.current = 0
-    setOctaveShift(0)
 
-    const releaseAllHeld = () => {
-      for (const note of heldKeys.current.values()) deactivate(note)
-      heldKeys.current.clear()
-    }
+    const keyMap = buildKeyMap(octaveStart)
 
     const down = (e) => {
       if (e.repeat || e.metaKey || e.ctrlKey || e.altKey) return
-      // Caps Lock — toggle down one octave (LED confirms state)
-      if (e.key === 'CapsLock') {
-        const next = shiftRef.current === -1 ? 0 : -1
-        if (next === 0) releaseAllHeld()
-        shiftRef.current = next
-        setOctaveShift(next)
-        return
-      }
-      // Backtick — toggle up one octave
-      if (e.key === '`') {
-        const next = shiftRef.current === 1 ? 0 : 1
-        if (next === 0) releaseAllHeld()
-        shiftRef.current = next
-        setOctaveShift(next)
-        return
-      }
-      const keyMap = buildKeyMap(octaveStart + shiftRef.current)
-      const note = keyMap[e.key]
-      if (note && !heldKeys.current.has(e.key)) {
-        heldKeys.current.set(e.key, note)
+      if (e.key === 'Tab') { e.preventDefault(); onOctaveDown?.(); return }
+      if (e.key === '\\') { onOctaveUp?.(); return }
+      // Normalize to lowercase so Caps Lock being on doesn't break note keys
+      const k = e.key.length === 1 ? e.key.toLowerCase() : e.key
+      const note = keyMap[k]
+      if (note && !heldKeys.current.has(k)) {
+        heldKeys.current.set(k, note)
         activate(note)
       }
     }
 
     const up = (e) => {
-      const note = heldKeys.current.get(e.key)
+      const k = e.key.length === 1 ? e.key.toLowerCase() : e.key
+      const note = heldKeys.current.get(k)
       if (note) {
-        heldKeys.current.delete(e.key)
+        heldKeys.current.delete(k)
         deactivate(note)
       }
     }
@@ -121,7 +104,7 @@ export default function Piano({
       window.removeEventListener('keydown', down)
       window.removeEventListener('keyup', up)
     }
-  }, [keyboardMode, octaveStart, activate, deactivate])
+  }, [keyboardMode, octaveStart, activate, deactivate, onOctaveUp, onOctaveDown])
 
   function noteFromPoint(x, y) {
     const el = document.elementFromPoint(x, y)
@@ -164,19 +147,10 @@ export default function Piano({
   return (
     <div className="flex flex-col items-center gap-2">
       {keyboardMode && !compact && (
-        <div className="flex items-center gap-3 text-xs" style={{ color: 'rgba(168,85,247,0.7)' }}>
-          <span className="flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full inline-block"
-              style={{ background: '#a855f7', boxShadow: '0 0 6px #a855f7' }} />
-            [A–;] naturals · [W/E/T/Y/U/O/P] sharps
-          </span>
-          {octaveShift !== 0 ? (
-            <span style={{ color: '#22d3ee', fontWeight: 700, letterSpacing: '0.05em' }}>
-              {octaveShift > 0 ? '▲ +1 oct  [` again to reset]' : '▼ −1 oct  [⇪ again to reset]'}
-            </span>
-          ) : (
-            <span style={{ color: 'rgba(148,163,184,0.3)' }}>⇪ Caps Lock / ` to shift oct</span>
-          )}
+        <div className="flex items-center gap-2 text-xs" style={{ color: 'rgba(168,85,247,0.7)' }}>
+          <span className="w-1.5 h-1.5 rounded-full inline-block flex-shrink-0"
+            style={{ background: '#a855f7', boxShadow: '0 0 6px #a855f7' }} />
+          [A–↵] naturals · [W/E/T/Y/U/O/P/]] sharps · Tab ↓ oct · \ ↑ oct
         </div>
       )}
       <div
