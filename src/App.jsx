@@ -745,7 +745,7 @@ export default function App() {
 
                 <div className="flex-shrink-0">
                   <Piano
-                    octaveStart={octave} numOctaves={2} keyboardMode={keyboardMode}
+                    octaveStart={octave - 1} numOctaves={3} keyboardMode={keyboardMode}
                     onNoteOn={handlePianoNoteOn}
                     onNoteOff={handlePianoNoteOff}
                   />

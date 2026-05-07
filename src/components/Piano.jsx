@@ -4,6 +4,10 @@ import { noteOn, noteOff } from '../audio/engine.js'
 
 function buildKeyMap(o) {
   return {
+    // Z row — lower octave, white keys only
+    'z': `C${o-1}`, 'x': `D${o-1}`, 'c': `E${o-1}`, 'v': `F${o-1}`,
+    'b': `G${o-1}`, 'n': `A${o-1}`, 'm': `B${o-1}`,
+    // Home row — two octaves with sharps on QWERTY row above
     'a': `C${o}`,   'w': `C#${o}`,  's': `D${o}`,   'e': `D#${o}`,  'd': `E${o}`,
     'f': `F${o}`,   't': `F#${o}`,  'g': `G${o}`,   'y': `G#${o}`,  'h': `A${o}`,
     'u': `A#${o}`,  'j': `B${o}`,
@@ -131,7 +135,7 @@ export default function Piano({
           style={{ color: 'rgba(168,85,247,0.7)' }}>
           <span className="w-1.5 h-1.5 rounded-full inline-block"
             style={{ background: '#a855f7', boxShadow: '0 0 6px #a855f7' }} />
-          Keyboard active — [A–;] play notes
+          [Z–M] low · [A–;] mid · [W/E/T/Y/U/O/P] sharps
         </div>
       )}
       <div
