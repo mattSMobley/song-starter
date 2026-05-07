@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0d0820"/>
+      <stop offset="100%" style="stop-color:#060410"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#7c3aed;stop-opacity:0.4"/>
+      <stop offset="100%" style="stop-color:#06b6d4;stop-opacity:0.15"/>
+    </linearGradient>
+    <filter id="blur">
+      <feGaussianBlur stdDeviation="60"/>
+    </filter>
+    <filter id="keyglow">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bg)"/>
+
+  <!-- Ambient glow blobs -->
+  <ellipse cx="300" cy="200" rx="320" ry="260" fill="#7c3aed" opacity="0.18" filter="url(#blur)"/>
+  <ellipse cx="900" cy="420" rx="280" ry="220" fill="#06b6d4" opacity="0.12" filter="url(#blur)"/>
+
+  <!-- Border -->
+  <rect x="1" y="1" width="1198" height="628" rx="0" fill="none" stroke="rgba(124,58,237,0.35)" stroke-width="2"/>
+
+  <!-- Logo mark — small circle -->
+  <circle cx="120" cy="108" r="22" fill="none" stroke="#a855f7" stroke-width="2.5"/>
+  <circle cx="120" cy="108" r="8" fill="#a855f7"/>
+
+  <!-- App name -->
+  <text x="158" y="122" font-family="system-ui, -apple-system, sans-serif" font-size="42" font-weight="700" fill="#f0e6ff" letter-spacing="-1">Song Starter</text>
+
+  <!-- Tagline -->
+  <text x="120" y="185" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="400" fill="rgba(148,163,184,0.7)" letter-spacing="0.3">Generate melodies · Play chords · Start your song.</text>
+
+  <!-- Piano keyboard — centered, decorative -->
+  <!-- White keys -->
+  <g transform="translate(148, 270)">
+    <!-- 14 white keys -->
+    <rect x="0"    y="0" width="60" height="180" rx="5" fill="#e8e4f0" stroke="#1a1030" stroke-width="2"/>
+    <rect x="66"   y="0" width="60" height="180" rx="5" fill="#e8e4f0" stroke="#1a1030" stroke-width="2"/>
+    <rect x="132"  y="0" width="60" height="180" rx="5" fill="#e8e4f0" stroke="#1a1030" stroke-width="2"/>
+    <rect x="198"  y="0" width="60" height="180" rx="5" fill="#e8e4f0" stroke="#1a1030" stroke-width="2"/>
+    <rect x="264"  y="0" width="60" height="180" rx="5" fill="#e8e4f0" stroke="#1a1030" stroke-width="2"/>
+    <rect x="330"  y="0" width="60" height="180" rx="5" fill="#e8e4f0" stroke="#1a1030" stroke-width="2"/>
+    <rect x="396"  y="0" width="60" height="180" rx="5" fill="#e8e4f0" stroke="#1a1030" stroke-width="2"/>
+    <rect x="462"  y="0" width="60" height="180" rx="5" fill="#e8e4f0" stroke="#1a1030" stroke-width="2"/>
+    <rect x="528"  y="0" width="60" height="180" rx="5" fill="#e8e4f0" stroke="#1a1030" stroke-width="2"/>
+    <rect x="594"  y="0" width="60" height="180" rx="5" fill="#e8e4f0" stroke="#1a1030" stroke-width="2"/>
+    <rect x="660"  y="0" width="60" height="180" rx="5" fill="#e8e4f0" stroke="#1a1030" stroke-width="2"/>
+    <rect x="726"  y="0" width="60" height="180" rx="5" fill="#e8e4f0" stroke="#1a1030" stroke-width="2"/>
+    <rect x="792"  y="0" width="60" height="180" rx="5" fill="#e8e4f0" stroke="#1a1030" stroke-width="2"/>
+    <rect x="858"  y="0" width="60" height="180" rx="5" fill="#e8e4f0" stroke="#1a1030" stroke-width="2"/>
+
+    <!-- Glowing active keys (C maj chord: C E G) -->
+    <rect x="0"   y="0" width="60" height="180" rx="5" fill="url(#glow)" stroke="#a855f7" stroke-width="2.5" filter="url(#keyglow)"/>
+    <rect x="132" y="0" width="60" height="180" rx="5" fill="url(#glow)" stroke="#a855f7" stroke-width="2.5" filter="url(#keyglow)"/>
+    <rect x="264" y="0" width="60" height="180" rx="5" fill="url(#glow)" stroke="#a855f7" stroke-width="2.5" filter="url(#keyglow)"/>
+
+    <!-- Black keys -->
+    <rect x="42"   y="0" width="40" height="114" rx="4" fill="#0d0820" stroke="#7c3aed" stroke-width="1.5"/>
+    <rect x="108"  y="0" width="40" height="114" rx="4" fill="#0d0820" stroke="#2a1a4a" stroke-width="1"/>
+    <rect x="240"  y="0" width="40" height="114" rx="4" fill="#0d0820" stroke="#2a1a4a" stroke-width="1"/>
+    <rect x="306"  y="0" width="40" height="114" rx="4" fill="#0d0820" stroke="#2a1a4a" stroke-width="1"/>
+    <rect x="372"  y="0" width="40" height="114" rx="4" fill="#0d0820" stroke="#2a1a4a" stroke-width="1"/>
+    <rect x="504"  y="0" width="40" height="114" rx="4" fill="#0d0820" stroke="#7c3aed" stroke-width="1.5"/>
+    <rect x="570"  y="0" width="40" height="114" rx="4" fill="#0d0820" stroke="#2a1a4a" stroke-width="1"/>
+    <rect x="702"  y="0" width="40" height="114" rx="4" fill="#0d0820" stroke="#2a1a4a" stroke-width="1"/>
+    <rect x="768"  y="0" width="40" height="114" rx="4" fill="#0d0820" stroke="#2a1a4a" stroke-width="1"/>
+    <rect x="834"  y="0" width="40" height="114" rx="4" fill="#0d0820" stroke="#2a1a4a" stroke-width="1"/>
+  </g>
+
+  <!-- URL -->
+  <text x="1080" y="590" font-family="system-ui, -apple-system, sans-serif" font-size="18" font-weight="500" fill="rgba(168,85,247,0.55)" text-anchor="end" letter-spacing="0.5">songstarter.netlify.app</text>
+</svg>
