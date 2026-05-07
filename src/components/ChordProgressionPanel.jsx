@@ -5,7 +5,7 @@ import { getProgressions } from '../audio/chordProgressions.js'
 
 const BEATS_OPTIONS = [1, 2, 4]
 
-export default function ChordProgressionPanel({ root, scale, bpm }) {
+export default function ChordProgressionPanel({ root, scale, bpm, onChordChange }) {
   const [beatsPerChord, setBeatsPerChord] = useState(2)
   const [playingIdx, setPlayingIdx] = useState(-1)
   const [activeChord, setActiveChord] = useState(-1)
@@ -23,6 +23,7 @@ export default function ChordProgressionPanel({ root, scale, bpm }) {
     playingIdxRef.current = -1
     setPlayingIdx(-1)
     setActiveChord(-1)
+    onChordChange?.([])
     if (partRef.current) { partRef.current.dispose(); partRef.current = null }
     Tone.getTransport().stop()
     Tone.getTransport().position = 0
@@ -52,7 +53,10 @@ export default function ChordProgressionPanel({ root, scale, bpm }) {
 
     const part = new Tone.Part((time, ev) => {
       ev.chord.notes.forEach(note => playNoteAt(note, chordDur, time))
-      Tone.getDraw().schedule(() => setActiveChord(ev.chordIdx), time)
+      Tone.getDraw().schedule(() => {
+        setActiveChord(ev.chordIdx)
+        onChordChange?.(ev.chord.notes)
+      }, time)
     }, events)
 
     part.loop    = true

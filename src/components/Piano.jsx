@@ -39,6 +39,7 @@ export default function Piano({
   numOctaves = 2,
   keyboardMode = true,
   highlightNotes = [],
+  chordNotes = [],
   onNoteOn,
   onNoteOff,
   compact = false,
@@ -155,7 +156,14 @@ export default function Piano({
       >
         {whites.map(({ note, whiteIdx }) => {
           const isActive = activeNotes.has(note)
+          const isChordNote = chordNotes.includes(note)
           const isHighlighted = highlightNotes.includes(note)
+          const outlineStyle = isActive ? undefined
+            : isChordNote ? '2px solid rgba(6,182,212,1)'
+            : isHighlighted ? '2px solid rgba(6,182,212,0.4)'
+            : undefined
+          const bgOverlay = !isActive && isChordNote
+            ? 'rgba(6,182,212,0.12)' : undefined
           return (
             <div
               key={note}
@@ -167,7 +175,8 @@ export default function Piano({
                 top: 0,
                 width: WHITE_W - 2,
                 height: WHITE_H - 10,
-                outline: isHighlighted && !isActive ? '2px solid rgba(6,182,212,0.6)' : undefined,
+                outline: outlineStyle,
+                background: bgOverlay,
               }}
               onMouseDown={() => activate(note)}
               onMouseUp={() => deactivate(note)}
@@ -186,6 +195,12 @@ export default function Piano({
 
         {blacks.map(({ note, afterWhite }) => {
           const isActive = activeNotes.has(note)
+          const isChordNote = chordNotes.includes(note)
+          const isHighlighted = highlightNotes.includes(note)
+          const blackOutline = isActive ? undefined
+            : isChordNote ? '2px solid rgba(6,182,212,1)'
+            : isHighlighted ? '2px solid rgba(6,182,212,0.4)'
+            : undefined
           return (
             <div
               key={note}
@@ -197,6 +212,8 @@ export default function Piano({
                 top: 0,
                 width: BLACK_W,
                 height: BLACK_H,
+                outline: blackOutline,
+                boxShadow: isChordNote && !isActive ? '0 0 8px rgba(6,182,212,0.5)' : undefined,
               }}
               onMouseDown={(e) => { e.stopPropagation(); activate(note) }}
               onMouseUp={(e) => { e.stopPropagation(); deactivate(note) }}

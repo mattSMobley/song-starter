@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import * as Tone from 'tone'
 import Piano from './components/Piano.jsx'
 import MelodyCard from './components/MelodyCard.jsx'
@@ -12,7 +12,7 @@ import ChordProgressionPanel from './components/ChordProgressionPanel.jsx'
 import SessionTab from './components/SessionTab.jsx'
 import { startAudio, setInstrument, playNote, onSamplerLoading, setTempo, INSTRUMENTS } from './audio/engine.js'
 import { initMidi, getMidiOutputs, selectOutput, setMidiChannel, getMidiChannel, isMidiActive, getSelectedOutputId, onOutputsChange } from './audio/midiOut.js'
-import { ROOTS, SCALE_NAMES } from './audio/scales.js'
+import { ROOTS, SCALE_NAMES, getScaleNotes } from './audio/scales.js'
 import { generateVariations } from './audio/melodyGen.js'
 
 const TABS = ['Generate', 'Chords', 'Session', 'Browse', 'Inventory', 'Record']
@@ -20,19 +20,20 @@ const TABS = ['Generate', 'Chords', 'Session', 'Browse', 'Inventory', 'Record']
 export default function App() {
   const [started, setStarted] = useState(false)
   const [activeTab, setActiveTab] = useState('Generate')
-  const [root, setRoot] = useState('C')
-  const [scale, setScale] = useState('pentatonic')
-  const [instrument, setInstrumentState] = useState('keys')
+  const [root, setRoot] = useState(() => localStorage.getItem('ss_root') || 'C')
+  const [scale, setScale] = useState(() => localStorage.getItem('ss_scale') || 'pentatonic')
+  const [instrument, setInstrumentState] = useState(() => localStorage.getItem('ss_instrument') || 'keys')
   const [genBars, setGenBars] = useState(2)
   const [genCount, setGenCount] = useState(8)
-  const [bpm, setBpm] = useState(120)
-  const [octave, setOctave] = useState(4)
+  const [bpm, setBpm] = useState(() => parseInt(localStorage.getItem('ss_bpm')) || 120)
+  const [octave, setOctave] = useState(() => parseInt(localStorage.getItem('ss_octave')) || 4)
   const [melodies, setMelodies] = useState([])
   const [loops, setLoops] = useState([])
   const [generating, setGenerating] = useState(false)
   const [keyboardMode, setKeyboardMode] = useState(true)
-  const [variation, setVariation] = useState(0)
+  const [variation, setVariation] = useState(() => parseInt(localStorage.getItem('ss_variation')) || 0)
   const [samplerLoading, setSamplerLoading] = useState(false)
+  const [chordHighlights, setChordHighlights] = useState([])
   const [midiOutputs, setMidiOutputs] = useState([])
   const [midiOutputId, setMidiOutputId] = useState('')
   const [midiCh, setMidiCh] = useState(1)
@@ -61,6 +62,20 @@ export default function App() {
     return () => window.removeEventListener('resize', check)
   }, [])
 
+  // Persist session settings
+  useEffect(() => { localStorage.setItem('ss_root',       root) },       [root])
+  useEffect(() => { localStorage.setItem('ss_scale',      scale) },      [scale])
+  useEffect(() => { localStorage.setItem('ss_bpm',        bpm) },        [bpm])
+  useEffect(() => { localStorage.setItem('ss_octave',     octave) },     [octave])
+  useEffect(() => { localStorage.setItem('ss_instrument', instrument) }, [instrument])
+  useEffect(() => { localStorage.setItem('ss_variation',  variation) },  [variation])
+
+  // Scale notes for piano key highlighting
+  const scaleHighlights = useMemo(
+    () => getScaleNotes(root, scale, octave - 1, 3),
+    [root, scale, octave]
+  )
+
   useEffect(() => {
     initMidi().then(({ ok }) => {
       if (ok) {
@@ -83,6 +98,8 @@ export default function App() {
 
   async function handleStart() {
     await startAudio()
+    setTempo(bpm)
+    setInstrument(instrument, variation)
     onSamplerLoading(setSamplerLoading)
     setStarted(true)
     generateMelodies()
@@ -708,6 +725,8 @@ export default function App() {
                   <ChordDisplay activeNotes={activeNotes} />
                   <Piano
                     compact octaveStart={octave} numOctaves={1} keyboardMode={false}
+                    highlightNotes={scaleHighlights}
+                    chordNotes={chordHighlights}
                     onNoteOn={handlePianoNoteOn}
                     onNoteOff={handlePianoNoteOff}
                   />
@@ -773,6 +792,8 @@ export default function App() {
                   <div style={{ overflowX: 'auto', flex: 1, minWidth: 0 }}>
                     <Piano
                       octaveStart={octave - 1} numOctaves={3} keyboardMode={keyboardMode}
+                      highlightNotes={scaleHighlights}
+                      chordNotes={chordHighlights}
                       onNoteOn={handlePianoNoteOn}
                       onNoteOff={handlePianoNoteOff}
                     />
@@ -969,7 +990,7 @@ export default function App() {
 
               {/* Chords */}
               {activeTab === 'Chords' && (
-                <ChordProgressionPanel root={root} scale={scale} bpm={bpm} />
+                <ChordProgressionPanel root={root} scale={scale} bpm={bpm} onChordChange={setChordHighlights} />
               )}
 
               {/* Session */}
