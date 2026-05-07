@@ -57,10 +57,15 @@ export default function Piano({
   const touchNoteRef = useRef(null)
 
   const activate = useCallback((note) => {
-    Tone.start() // fire-and-forget — context already running after first interaction
     setActiveNotes(prev => new Set([...prev, note]))
-    noteOn(note)
-    onNoteOn?.(note)
+    if (Tone.context.state === 'running') {
+      // Context already running (desktop after first interaction) — play immediately
+      noteOn(note)
+      onNoteOn?.(note)
+    } else {
+      // Context suspended (iOS Safari) — must await before playing
+      Tone.start().then(() => { noteOn(note); onNoteOn?.(note) })
+    }
   }, [onNoteOn])
 
   const deactivate = useCallback((note) => {

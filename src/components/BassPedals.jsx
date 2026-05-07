@@ -24,10 +24,13 @@ export default function BassPedals({
   const heldKeys = useRef(new Set())
 
   const activate = useCallback((note) => {
-    Tone.start()
     setActiveNotes(prev => new Set([...prev, note]))
-    noteOn(note)
-    onNoteOn?.(note)
+    if (Tone.context.state === 'running') {
+      noteOn(note)
+      onNoteOn?.(note)
+    } else {
+      Tone.start().then(() => { noteOn(note); onNoteOn?.(note) })
+    }
   }, [onNoteOn])
 
   const deactivate = useCallback((note) => {
