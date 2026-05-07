@@ -10,6 +10,7 @@ import BrowseTab from './components/BrowseTab.jsx'
 import ChordDisplay from './components/ChordDisplay.jsx'
 import ChordProgressionPanel from './components/ChordProgressionPanel.jsx'
 import SessionTab from './components/SessionTab.jsx'
+import BassPedals from './components/BassPedals.jsx'
 import { startAudio, setInstrument, playNote, onSamplerLoading, setTempo, INSTRUMENTS } from './audio/engine.js'
 import { initMidi, getMidiOutputs, selectOutput, setMidiChannel, getMidiChannel, isMidiActive, getSelectedOutputId, onOutputsChange } from './audio/midiOut.js'
 import { ROOTS, SCALE_NAMES, getScaleNotes } from './audio/scales.js'
@@ -787,11 +788,19 @@ export default function App() {
                   </button>
                 </div>
 
-                {/* Row 2: piano (scrollable) + variation stops */}
+                {/* Row 2: piano + bass pedals (scrollable) + variation stops */}
                 <div className="flex items-start gap-3">
-                  <div style={{ overflowX: 'auto', flex: 1, minWidth: 0 }}>
+                  <div className="flex flex-col gap-3" style={{ overflowX: 'auto', flex: 1, minWidth: 0 }}>
                     <Piano
-                      octaveStart={octave - 1} numOctaves={3} keyboardMode={keyboardMode}
+                      octaveStart={octave} numOctaves={2} keyboardMode={keyboardMode}
+                      highlightNotes={scaleHighlights}
+                      chordNotes={chordHighlights}
+                      onNoteOn={handlePianoNoteOn}
+                      onNoteOff={handlePianoNoteOff}
+                    />
+                    <BassPedals
+                      octave={octave - 1}
+                      keyboardMode={keyboardMode}
                       highlightNotes={scaleHighlights}
                       chordNotes={chordHighlights}
                       onNoteOn={handlePianoNoteOn}

@@ -4,10 +4,7 @@ import { noteOn, noteOff } from '../audio/engine.js'
 
 function buildKeyMap(o) {
   return {
-    // Z row — lower octave, white keys only
-    'z': `C${o-1}`, 'x': `D${o-1}`, 'c': `E${o-1}`, 'v': `F${o-1}`,
-    'b': `G${o-1}`, 'n': `A${o-1}`, 'm': `B${o-1}`,
-    // Home row — two octaves with sharps on QWERTY row above
+    // Home row — naturals, two octaves
     'a': `C${o}`,   'w': `C#${o}`,  's': `D${o}`,   'e': `D#${o}`,  'd': `E${o}`,
     'f': `F${o}`,   't': `F#${o}`,  'g': `G${o}`,   'y': `G#${o}`,  'h': `A${o}`,
     'u': `A#${o}`,  'j': `B${o}`,
@@ -45,10 +42,11 @@ export default function Piano({
   compact = false,
 }) {
   const [activeNotes, setActiveNotes] = useState(new Set())
-  const heldKeys = useRef(new Set())
+  const heldKeys = useRef(new Map()) // key → note (so keyup always releases the right note)
   const touchNoteRef = useRef(null)
+  const shiftRef = useRef(0)
+  const [octaveShift, setOctaveShift] = useState(0) // display only
 
-  // Ensure AudioContext is running before every note — critical on mobile
   const activate = useCallback(async (note) => {
     await Tone.start()
     setActiveNotes(prev => new Set([...prev, note]))
@@ -64,26 +62,42 @@ export default function Piano({
 
   useEffect(() => {
     if (!keyboardMode) return
-    const keyMap = buildKeyMap(octaveStart)
-    // Clear stale held state when octave or mode changes
     heldKeys.current.clear()
     setActiveNotes(new Set())
+    shiftRef.current = 0
+    setOctaveShift(0)
+
+    const releaseAllHeld = () => {
+      for (const note of heldKeys.current.values()) deactivate(note)
+      heldKeys.current.clear()
+    }
 
     const down = (e) => {
       if (e.repeat || e.metaKey || e.ctrlKey || e.altKey) return
+      if (e.key === 'Tab') { e.preventDefault(); shiftRef.current = 1; setOctaveShift(1); return }
+      if (e.key === '`') { shiftRef.current = -1; setOctaveShift(-1); return }
+      const keyMap = buildKeyMap(octaveStart + shiftRef.current)
       const note = keyMap[e.key]
       if (note && !heldKeys.current.has(e.key)) {
-        heldKeys.current.add(e.key)
+        heldKeys.current.set(e.key, note)
         activate(note)
       }
     }
+
     const up = (e) => {
-      const note = keyMap[e.key]
+      if (e.key === 'Tab' || e.key === '`') {
+        releaseAllHeld()
+        shiftRef.current = 0
+        setOctaveShift(0)
+        return
+      }
+      const note = heldKeys.current.get(e.key)
       if (note) {
         heldKeys.current.delete(e.key)
         deactivate(note)
       }
     }
+
     window.addEventListener('keydown', down)
     window.addEventListener('keyup', up)
     return () => {
@@ -92,7 +106,6 @@ export default function Piano({
     }
   }, [keyboardMode, octaveStart, activate, deactivate])
 
-  // ── Touch helpers: all handled on the container so swipe works ──────────
   function noteFromPoint(x, y) {
     const el = document.elementFromPoint(x, y)
     return el?.closest('[data-note]')?.dataset.note ?? null
@@ -123,20 +136,28 @@ export default function Piano({
   }
 
   const { whites, blacks } = buildKeys(octaveStart, numOctaves)
-  const WHITE_W = compact ? 30 : numOctaves >= 3 ? 36 : 42
+  const WHITE_W = compact ? 30 : 42
   const WHITE_H = compact ? 110 : 140
-  const BLACK_W = compact ? 19 : numOctaves >= 3 ? 22 : 26
-  const BLACK_H = compact ? 68 : numOctaves >= 3 ? 86 : 88
+  const BLACK_W = compact ? 19 : 26
+  const BLACK_H = compact ? 68 : 88
   const totalW = whites.length * WHITE_W
 
   return (
     <div className="flex flex-col items-center gap-2">
       {keyboardMode && !compact && (
-        <div className="flex items-center gap-2 text-xs"
-          style={{ color: 'rgba(168,85,247,0.7)' }}>
-          <span className="w-1.5 h-1.5 rounded-full inline-block"
-            style={{ background: '#a855f7', boxShadow: '0 0 6px #a855f7' }} />
-          [Z–M] low · [A–;] mid · [W/E/T/Y/U/O/P] sharps
+        <div className="flex items-center gap-3 text-xs" style={{ color: 'rgba(168,85,247,0.7)' }}>
+          <span className="flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full inline-block"
+              style={{ background: '#a855f7', boxShadow: '0 0 6px #a855f7' }} />
+            [A–;] naturals · [W/E/T/Y/U/O/P] sharps
+          </span>
+          {octaveShift !== 0 ? (
+            <span style={{ color: '#22d3ee', fontWeight: 700, letterSpacing: '0.05em' }}>
+              {octaveShift > 0 ? '▲ +1 oct' : '▼ −1 oct'}
+            </span>
+          ) : (
+            <span style={{ color: 'rgba(148,163,184,0.3)' }}>hold ` / Tab to shift oct</span>
+          )}
         </div>
       )}
       <div
@@ -162,8 +183,7 @@ export default function Piano({
             : isChordNote ? '2px solid rgba(6,182,212,1)'
             : isHighlighted ? '2px solid rgba(6,182,212,0.4)'
             : undefined
-          const bgOverlay = !isActive && isChordNote
-            ? 'rgba(6,182,212,0.12)' : undefined
+          const bgOverlay = !isActive && isChordNote ? 'rgba(6,182,212,0.12)' : undefined
           return (
             <div
               key={note}
