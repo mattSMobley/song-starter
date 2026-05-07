@@ -711,7 +711,7 @@ export default function App() {
           {/* Piano zone */}
           <div className="flex-shrink-0"
             style={{
-              padding: isMobile ? '12px 16px' : '16px 28px 16px 32px',
+              padding: isMobile ? '10px 16px' : '10px 28px 10px 32px',
               overflow: 'hidden',
               background: 'linear-gradient(180deg, rgba(16,8,36,0.88) 0%, rgba(8,5,18,0.72) 60%, rgba(6,4,14,0.5) 100%)',
               borderBottom: '1px solid rgba(124,58,237,0.22)',
@@ -757,7 +757,7 @@ export default function App() {
               </div>
             ) : (
               /* ── Desktop piano zone — 2-row layout ── */
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-1">
                 {/* Row 1: chord display + keyboard toggle + sampler loading */}
                 <div className="flex items-center gap-3">
                   <ChordDisplay activeNotes={activeNotes} />
@@ -790,10 +790,10 @@ export default function App() {
 
                 {/* Row 2: piano + bass pedals (scrollable) + variation stops */}
                 <div className="flex items-start gap-3">
-                  <div className="flex flex-col gap-3" style={{ overflowX: 'auto', flex: 1, minWidth: 0 }}>
+                  <div className="flex flex-col gap-2" style={{ overflowX: 'auto', flex: 1, minWidth: 0 }}>
                     <Piano
                       octaveStart={octave} numOctaves={2} keyboardMode={keyboardMode}
-                      clipEnd={`F${octave + 1}`}
+                      clipEnd={null}
                       highlightNotes={scaleHighlights}
                       chordNotes={chordHighlights}
                       onNoteOn={handlePianoNoteOn}
@@ -837,41 +837,106 @@ export default function App() {
           </div>
 
           {/* Tab area */}
-          <div className="flex-1 flex flex-col overflow-hidden gap-4" style={{ padding: '20px 32px' }}>
+          <div className="flex-1 flex flex-col overflow-hidden gap-3" style={{ padding: '12px 32px' }}>
 
-            {/* Tab bar */}
-            <div className="overflow-x-auto flex-shrink-0" style={{ maxWidth: '100%' }}>
-            <div className="flex items-center gap-1"
-              style={{
-                background: 'rgba(10,5,22,0.85)',
-                border: '1px solid rgba(124,58,237,0.2)',
-                borderRadius: 14,
-                padding: '4px',
-                width: 'fit-content',
-                backdropFilter: 'blur(12px)',
-                boxShadow: '0 0 20px rgba(124,58,237,0.08)',
-              }}>
-              {TABS.map(tab => {
-                const on = activeTab === tab
-                return (
-                  <button key={tab} onClick={() => setActiveTab(tab)}
-                    className="rounded-xl text-sm font-semibold transition-all"
+            {/* Tab bar + contextual actions */}
+            <div className="flex items-center gap-3 flex-shrink-0">
+              <div style={{ overflowX: 'auto', flexShrink: 0 }}>
+                <div className="flex items-center gap-1"
+                  style={{
+                    background: 'rgba(10,5,22,0.85)',
+                    border: '1px solid rgba(124,58,237,0.2)',
+                    borderRadius: 14,
+                    padding: '4px',
+                    width: 'fit-content',
+                    backdropFilter: 'blur(12px)',
+                    boxShadow: '0 0 20px rgba(124,58,237,0.08)',
+                  }}>
+                  {TABS.map(tab => {
+                    const on = activeTab === tab
+                    return (
+                      <button key={tab} onClick={() => setActiveTab(tab)}
+                        className="rounded-xl font-semibold transition-all"
+                        style={{
+                          padding: '6px 18px',
+                          fontSize: '0.78rem',
+                          background: on
+                            ? 'linear-gradient(135deg, rgba(124,58,237,0.58), rgba(109,40,217,0.38))'
+                            : 'transparent',
+                          color: on ? '#f0e0ff' : 'rgba(148,163,184,0.45)',
+                          border: on ? '1px solid rgba(168,85,247,0.55)' : '1px solid transparent',
+                          boxShadow: on ? '0 0 22px rgba(124,58,237,0.4), inset 0 1px 0 rgba(255,255,255,0.1)' : 'none',
+                          letterSpacing: '0.04em',
+                          textShadow: on ? '0 0 12px rgba(168,85,247,0.8)' : 'none',
+                        }}>
+                        {tab}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {activeTab === 'Generate' && (
+                <>
+                  <div className="flex-1" />
+                  <span style={{ fontSize: '0.68rem', color: 'rgba(148,163,184,0.4)', letterSpacing: '0.04em', flexShrink: 0 }}>
+                    <span style={{ color: '#c084fc' }}>{root}</span>{' '}
+                    <span style={{ color: '#22d3ee' }}>{scale}</span>
+                  </span>
+                  <button
+                    onClick={generateMelodies} disabled={generating}
+                    className={`flex items-center gap-1.5 rounded-xl font-semibold transition-all flex-shrink-0${!generating ? ' btn-breathe' : ''}`}
                     style={{
-                      padding: '10px 26px',
-                      background: on
-                        ? 'linear-gradient(135deg, rgba(124,58,237,0.58), rgba(109,40,217,0.38))'
-                        : 'transparent',
-                      color: on ? '#f0e0ff' : 'rgba(148,163,184,0.45)',
-                      border: on ? '1px solid rgba(168,85,247,0.55)' : '1px solid transparent',
-                      boxShadow: on ? '0 0 22px rgba(124,58,237,0.4), inset 0 1px 0 rgba(255,255,255,0.1)' : 'none',
+                      padding: '6px 16px',
+                      fontSize: '0.78rem',
+                      background: generating
+                        ? 'rgba(124,58,237,0.1)'
+                        : 'linear-gradient(135deg, rgba(124,58,237,0.58), rgba(109,40,217,0.38))',
+                      border: generating ? '1px solid rgba(168,85,247,0.2)' : '1px solid rgba(168,85,247,0.55)',
+                      color: generating ? 'rgba(168,85,247,0.4)' : '#f0e0ff',
+                      boxShadow: generating ? 'none' : '0 0 14px rgba(124,58,237,0.35), inset 0 1px 0 rgba(255,255,255,0.1)',
                       letterSpacing: '0.04em',
-                      textShadow: on ? '0 0 12px rgba(168,85,247,0.8)' : 'none',
+                      textShadow: generating ? 'none' : '0 0 10px rgba(168,85,247,0.8)',
                     }}>
-                    {tab}
+                    {generating ? (
+                      <div className="w-3 h-3 rounded-full border-2 border-purple-500 border-t-transparent"
+                        style={{ animation: 'spin 0.8s linear infinite' }} />
+                    ) : (
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <polyline points="23,4 23,10 17,10"/>
+                        <path d="M20.5 15a9 9 0 11-2.6-7.4L23 10"/>
+                      </svg>
+                    )}
+                    {generating ? 'Generating…' : 'Regenerate'}
                   </button>
-                )
-              })}
-            </div>
+                  {melodies.length > 0 && (
+                    <button
+                      onClick={playAll}
+                      className="flex items-center gap-1.5 rounded-xl font-semibold transition-all flex-shrink-0"
+                      style={{
+                        padding: '6px 16px',
+                        fontSize: '0.78rem',
+                        background: playAllIdx >= 0 ? 'rgba(34,211,238,0.18)' : 'rgba(34,211,238,0.06)',
+                        border: playAllIdx >= 0 ? '1px solid rgba(34,211,238,0.5)' : '1px solid rgba(34,211,238,0.2)',
+                        color: playAllIdx >= 0 ? '#22d3ee' : 'rgba(34,211,238,0.5)',
+                        boxShadow: playAllIdx >= 0 ? '0 0 14px rgba(34,211,238,0.25)' : 'none',
+                        letterSpacing: '0.04em',
+                        textShadow: playAllIdx >= 0 ? '0 0 10px rgba(34,211,238,0.7)' : 'none',
+                      }}>
+                      {playAllIdx >= 0 ? (
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+                          <rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>
+                        </svg>
+                      ) : (
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+                          <polygon points="5,3 19,12 5,21"/>
+                        </svg>
+                      )}
+                      {playAllIdx >= 0 ? `${playAllIdx + 1} / ${melodies.length}` : 'Play All'}
+                    </button>
+                  )}
+                </>
+              )}
             </div>
 
             {/* Tab content */}
@@ -880,111 +945,39 @@ export default function App() {
               {/* Generate */}
               {activeTab === 'Generate' && (
                 <div className="flex flex-col h-full gap-3">
-                  {/* Controls row */}
-                  <div className="flex items-center justify-between flex-shrink-0 gap-4">
-                    <div className="flex items-center gap-3">
-                      {/* Bars */}
-                      <div className="flex items-center gap-1.5">
-                        <span style={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.15em', color: 'rgba(168,85,247,0.6)', textTransform: 'uppercase' }}>Bars</span>
-                        {[1, 2, 4].map(b => (
-                          <button key={b} onClick={() => setGenBars(b)}
-                            className="rounded-lg font-bold font-mono transition-all"
-                            style={{
-                              padding: '5px 10px', fontSize: '0.75rem',
-                              background: genBars === b ? 'rgba(124,58,237,0.45)' : 'rgba(255,255,255,0.04)',
-                              border: genBars === b ? '1px solid rgba(168,85,247,0.6)' : '1px solid rgba(255,255,255,0.07)',
-                              color: genBars === b ? '#e0aaff' : 'rgba(148,163,184,0.5)',
-                              boxShadow: genBars === b ? '0 0 10px rgba(124,58,237,0.35)' : 'none',
-                            }}>
-                            {b}
-                          </button>
-                        ))}
-                      </div>
-                      {/* Count */}
-                      <div className="flex items-center gap-1.5">
-                        <span style={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.15em', color: 'rgba(168,85,247,0.6)', textTransform: 'uppercase' }}>Count</span>
-                        {[4, 8, 12].map(c => (
-                          <button key={c} onClick={() => setGenCount(c)}
-                            className="rounded-lg font-bold font-mono transition-all"
-                            style={{
-                              padding: '5px 10px', fontSize: '0.75rem',
-                              background: genCount === c ? 'rgba(124,58,237,0.45)' : 'rgba(255,255,255,0.04)',
-                              border: genCount === c ? '1px solid rgba(168,85,247,0.6)' : '1px solid rgba(255,255,255,0.07)',
-                              color: genCount === c ? '#e0aaff' : 'rgba(148,163,184,0.5)',
-                              boxShadow: genCount === c ? '0 0 10px rgba(124,58,237,0.35)' : 'none',
-                            }}>
-                            {c}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <p className="text-xs" style={{ color: 'rgba(148,163,184,0.45)' }}>
-                        <span style={{ color: '#c084fc' }}>{root}</span>
-                        {' '}<span style={{ color: '#22d3ee' }}>{scale}</span>
-                      </p>
-                      <button
-                        onClick={generateMelodies} disabled={generating}
-                        className={`flex items-center gap-2.5 rounded-xl font-bold transition-all${!generating ? ' btn-breathe' : ''}`}
-                        style={{
-                          padding: '12px 28px',
-                          fontSize: '0.78rem',
-                          background: generating
-                            ? 'rgba(124,58,237,0.1)'
-                            : 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 60%, #5b21b6 100%)',
-                          border: '1px solid rgba(196,132,252,0.45)',
-                          color: generating ? 'rgba(168,85,247,0.4)' : '#f0e6ff',
-                          boxShadow: generating ? 'none' : '0 0 28px rgba(124,58,237,0.5), inset 0 1px 0 rgba(255,255,255,0.12)',
-                          letterSpacing: '0.06em', textTransform: 'uppercase',
-                          textShadow: generating ? 'none' : '0 0 12px rgba(216,180,254,0.8)',
-                        }}>
-                        {generating ? (
-                          <>
-                            <div className="w-3 h-3 rounded-full border-2 border-purple-500 border-t-transparent"
-                              style={{ animation: 'spin 0.8s linear infinite' }} />
-                            Generating…
-                          </>
-                        ) : (
-                          <>
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                              <polyline points="23,4 23,10 17,10"/>
-                              <path d="M20.5 15a9 9 0 11-2.6-7.4L23 10"/>
-                            </svg>
-                            Regenerate
-                          </>
-                        )}
-                      </button>
-
-                      {/* Play All */}
-                      {melodies.length > 0 && (
-                        <button
-                          onClick={playAll}
-                          className="flex items-center gap-2 rounded-xl font-semibold transition-all"
+                  {/* Settings strip — Bars + Count */}
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    <div className="flex items-center gap-1">
+                      <span style={{ fontSize: '0.58rem', fontWeight: 700, letterSpacing: '0.14em', color: 'rgba(168,85,247,0.5)', textTransform: 'uppercase' }}>Bars</span>
+                      {[1, 2, 4].map(b => (
+                        <button key={b} onClick={() => setGenBars(b)}
+                          className="rounded font-bold font-mono transition-all"
                           style={{
-                            padding: '12px 20px',
-                            fontSize: '0.78rem',
-                            background: playAllIdx >= 0
-                              ? 'rgba(34,211,238,0.18)'
-                              : 'rgba(34,211,238,0.08)',
-                            border: playAllIdx >= 0 ? '1px solid rgba(34,211,238,0.5)' : '1px solid rgba(34,211,238,0.2)',
-                            color: playAllIdx >= 0 ? '#22d3ee' : 'rgba(34,211,238,0.5)',
-                            boxShadow: playAllIdx >= 0 ? '0 0 18px rgba(34,211,238,0.25)' : 'none',
-                            letterSpacing: '0.05em',
-                            textShadow: playAllIdx >= 0 ? '0 0 10px rgba(34,211,238,0.7)' : 'none',
+                            padding: '3px 8px', fontSize: '0.68rem',
+                            background: genBars === b ? 'rgba(124,58,237,0.45)' : 'rgba(255,255,255,0.04)',
+                            border: genBars === b ? '1px solid rgba(168,85,247,0.6)' : '1px solid rgba(255,255,255,0.07)',
+                            color: genBars === b ? '#e0aaff' : 'rgba(148,163,184,0.45)',
+                            boxShadow: genBars === b ? '0 0 8px rgba(124,58,237,0.3)' : 'none',
                           }}>
-                          {playAllIdx >= 0 ? (
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                              <rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>
-                            </svg>
-                          ) : (
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                              <polygon points="5,3 19,12 5,21" fill="currentColor" stroke="none"/>
-                              <line x1="19" y1="5" x2="19" y2="19"/>
-                            </svg>
-                          )}
-                          {playAllIdx >= 0 ? `${playAllIdx + 1}/${melodies.length}` : 'Play All'}
+                          {b}
                         </button>
-                      )}
+                      ))}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span style={{ fontSize: '0.58rem', fontWeight: 700, letterSpacing: '0.14em', color: 'rgba(168,85,247,0.5)', textTransform: 'uppercase' }}>Count</span>
+                      {[4, 8, 12].map(c => (
+                        <button key={c} onClick={() => setGenCount(c)}
+                          className="rounded font-bold font-mono transition-all"
+                          style={{
+                            padding: '3px 8px', fontSize: '0.68rem',
+                            background: genCount === c ? 'rgba(124,58,237,0.45)' : 'rgba(255,255,255,0.04)',
+                            border: genCount === c ? '1px solid rgba(168,85,247,0.6)' : '1px solid rgba(255,255,255,0.07)',
+                            color: genCount === c ? '#e0aaff' : 'rgba(148,163,184,0.45)',
+                            boxShadow: genCount === c ? '0 0 8px rgba(124,58,237,0.3)' : 'none',
+                          }}>
+                          {c}
+                        </button>
+                      ))}
                     </div>
                   </div>
                   <div className="flex-1 overflow-y-auto min-h-0">

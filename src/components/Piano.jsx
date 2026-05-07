@@ -2,15 +2,23 @@ import { useEffect, useCallback, useState, useRef } from 'react'
 import * as Tone from 'tone'
 import { noteOn, noteOff } from '../audio/engine.js'
 
+const KEY_LABEL = { "'": "'", ']': ']', 'Enter': '↵', ';': ';' }
+function keyLabel(k) { return KEY_LABEL[k] ?? k }
+
 function buildKeyMap(o) {
   return {
-    // Home row — naturals, two octaves
     'a': `C${o}`,   'w': `C#${o}`,  's': `D${o}`,   'e': `D#${o}`,  'd': `E${o}`,
     'f': `F${o}`,   't': `F#${o}`,  'g': `G${o}`,   'y': `G#${o}`,  'h': `A${o}`,
     'u': `A#${o}`,  'j': `B${o}`,
     'k': `C${o+1}`, 'o': `C#${o+1}`,'l': `D${o+1}`, 'p': `D#${o+1}`,';': `E${o+1}`,
-    "'": `F${o+1}`,
+    "'": `F${o+1}`, ']': `F#${o+1}`, 'Enter': `G${o+1}`,
   }
+}
+
+function buildNoteToKey(o) {
+  const reverse = {}
+  for (const [k, note] of Object.entries(buildKeyMap(o))) reverse[note] = k
+  return reverse
 }
 
 const WHITE_NOTES = ['C','D','E','F','G','A','B']
@@ -144,19 +152,8 @@ export default function Piano({
     }
   }
 
-  const { whites: allWhites, blacks: allBlacks } = buildKeys(octaveStart, numOctaves)
-
-  // Clip to only show keys that have keyboard mappings
-  let whites = allWhites
-  let blacks = allBlacks
-  if (clipEnd) {
-    const clipIdx = allWhites.findIndex(w => w.note === clipEnd)
-    if (clipIdx !== -1) {
-      whites = allWhites.slice(0, clipIdx + 1)
-      const maxIdx = whites[whites.length - 1].whiteIdx
-      blacks = allBlacks.filter(b => b.afterWhite <= maxIdx)
-    }
-  }
+  const { whites, blacks } = buildKeys(octaveStart, numOctaves)
+  const noteToKey = keyboardMode && !compact ? buildNoteToKey(octaveStart) : {}
 
   const WHITE_W = compact ? 30 : 42
   const WHITE_H = compact ? 110 : 140
@@ -224,10 +221,17 @@ export default function Piano({
               onMouseUp={() => deactivate(note)}
               onMouseLeave={() => { if (activeNotes.has(note)) deactivate(note) }}
             >
+              {!compact && noteToKey[note] && !isActive && (
+                <span className="absolute left-0 right-0 text-center font-mono"
+                  style={{ bottom: 22, fontSize: 9, color: 'rgba(148,163,184,0.75)', lineHeight: 1 }}>
+                  {keyLabel(noteToKey[note])}
+                </span>
+              )}
               <span className="absolute bottom-2 left-0 right-0 text-center font-mono"
                 style={{
-                  color: isActive ? 'rgba(255,255,255,0.85)' : 'rgba(71,85,105,0.7)',
                   fontSize: 9,
+                  color: isActive ? 'rgba(255,255,255,0.85)' : 'rgba(71,85,105,0.7)',
+                  lineHeight: 1,
                 }}>
                 {note.replace(/\d/, '')}
               </span>
@@ -260,7 +264,14 @@ export default function Piano({
               onMouseDown={(e) => { e.stopPropagation(); activate(note) }}
               onMouseUp={(e) => { e.stopPropagation(); deactivate(note) }}
               onMouseLeave={() => { if (activeNotes.has(note)) deactivate(note) }}
-            />
+            >
+              {!compact && noteToKey[note] && !isActive && (
+                <span className="absolute bottom-3 left-0 right-0 text-center font-mono"
+                  style={{ fontSize: 8, color: 'rgba(148,163,184,0.6)', lineHeight: 1 }}>
+                  {keyLabel(noteToKey[note])}
+                </span>
+              )}
+            </div>
           )
         })}
       </div>
