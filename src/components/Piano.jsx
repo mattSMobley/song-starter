@@ -122,10 +122,10 @@ export default function Piano({
   }
 
   const { whites, blacks } = buildKeys(octaveStart, numOctaves)
-  const WHITE_W = compact ? 30 : 42
-  const WHITE_H = compact ? 110 : 150
-  const BLACK_W = compact ? 19 : 26
-  const BLACK_H = compact ? 68 : 94
+  const WHITE_W = compact ? 30 : numOctaves >= 3 ? 36 : 42
+  const WHITE_H = compact ? 110 : 140
+  const BLACK_W = compact ? 19 : numOctaves >= 3 ? 22 : 26
+  const BLACK_H = compact ? 68 : numOctaves >= 3 ? 86 : 88
   const totalW = whites.length * WHITE_W
 
   return (

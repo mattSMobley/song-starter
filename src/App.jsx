@@ -736,30 +736,23 @@ export default function App() {
                 </div>
               </div>
             ) : (
-              /* ── Desktop piano zone ── */
-              <div className="flex items-center" style={{ gap: 20 }}>
-                {/* Chord display */}
-                <div className="flex-shrink-0 flex items-center justify-center" style={{ width: 195 }}>
+              /* ── Desktop piano zone — 2-row layout ── */
+              <div className="flex flex-col gap-2">
+                {/* Row 1: chord display + keyboard toggle + sampler loading */}
+                <div className="flex items-center gap-3">
                   <ChordDisplay activeNotes={activeNotes} />
-                </div>
-
-                <div className="flex-shrink-0">
-                  <Piano
-                    octaveStart={octave - 1} numOctaves={3} keyboardMode={keyboardMode}
-                    onNoteOn={handlePianoNoteOn}
-                    onNoteOff={handlePianoNoteOff}
-                  />
-                </div>
-
-                <div className="flex-1" />
-
-                {/* Right panel: keyboard toggle + variation stops */}
-                <div className="flex flex-col items-stretch gap-2.5 flex-shrink-0" style={{ width: 112 }}>
+                  <div className="flex-1" />
+                  {samplerLoading && (
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-1.5 h-1.5 rounded-full" style={{ background: '#22d3ee', animation: 'pulse 1s ease-in-out infinite' }} />
+                      <span style={{ fontSize: '0.62rem', color: '#22d3ee', letterSpacing: '0.08em' }}>loading…</span>
+                    </div>
+                  )}
                   <button
                     onClick={() => setKeyboardMode(m => !m)}
                     className="flex items-center justify-center gap-1.5 rounded-xl font-semibold transition-all"
                     style={{
-                      padding: '8px 10px', fontSize: '0.72rem',
+                      padding: '8px 14px', fontSize: '0.72rem',
                       background: keyboardMode ? 'linear-gradient(135deg, rgba(124,58,237,0.38) 0%, rgba(109,40,217,0.22) 100%)' : 'rgba(255,255,255,0.03)',
                       border: keyboardMode ? '1px solid rgba(168,85,247,0.6)' : '1px solid rgba(255,255,255,0.07)',
                       color: keyboardMode ? '#e9d5ff' : 'rgba(148,163,184,0.4)',
@@ -773,37 +766,40 @@ export default function App() {
                     </svg>
                     Keys {keyboardMode ? 'ON' : 'OFF'}
                   </button>
+                </div>
 
-                  <div style={{ height: 1, background: 'rgba(124,58,237,0.18)', margin: '0 4px' }} />
-
-                  {samplerLoading && (
-                    <div className="flex items-center gap-1.5 justify-center" style={{ padding: '4px 0' }}>
-                      <div className="w-1.5 h-1.5 rounded-full" style={{ background: '#22d3ee', animation: 'pulse 1s ease-in-out infinite' }} />
-                      <span style={{ fontSize: '0.62rem', color: '#22d3ee', letterSpacing: '0.08em' }}>loading…</span>
-                    </div>
-                  )}
-
-                  {(() => {
-                    const inst = INSTRUMENTS.find(i => i.id === instrument)
-                    return inst?.variations.map((v, idx) => {
-                      const on = variation === idx
-                      return (
-                        <button key={idx} onClick={() => handleVariationChange(idx)}
-                          className="rounded-lg font-semibold transition-all"
-                          style={{
-                            padding: '7px 10px', fontSize: '0.72rem', letterSpacing: '0.03em', textAlign: 'left',
-                            background: on ? 'linear-gradient(135deg, rgba(124,58,237,0.45), rgba(109,40,217,0.28))' : 'rgba(255,255,255,0.03)',
-                            border: on ? '1px solid rgba(168,85,247,0.55)' : '1px solid rgba(255,255,255,0.06)',
-                            color: on ? '#f0e0ff' : 'rgba(148,163,184,0.5)',
-                            boxShadow: on ? '0 0 12px rgba(124,58,237,0.35), inset 0 1px 0 rgba(255,255,255,0.06)' : 'none',
-                            textShadow: on ? '0 0 8px rgba(168,85,247,0.7)' : 'none',
-                          }}>
-                          <span style={{ opacity: 0.5, marginRight: 5, fontSize: '0.65rem' }}>{idx + 1}</span>
-                          {v}
-                        </button>
-                      )
-                    })
-                  })()}
+                {/* Row 2: piano (scrollable) + variation stops */}
+                <div className="flex items-start gap-3">
+                  <div style={{ overflowX: 'auto', flex: 1, minWidth: 0 }}>
+                    <Piano
+                      octaveStart={octave - 1} numOctaves={3} keyboardMode={keyboardMode}
+                      onNoteOn={handlePianoNoteOn}
+                      onNoteOff={handlePianoNoteOff}
+                    />
+                  </div>
+                  <div className="flex flex-col items-stretch gap-1.5 flex-shrink-0" style={{ width: 108 }}>
+                    {(() => {
+                      const inst = INSTRUMENTS.find(i => i.id === instrument)
+                      return inst?.variations.map((v, idx) => {
+                        const on = variation === idx
+                        return (
+                          <button key={idx} onClick={() => handleVariationChange(idx)}
+                            className="rounded-lg font-semibold transition-all"
+                            style={{
+                              padding: '7px 10px', fontSize: '0.72rem', letterSpacing: '0.03em', textAlign: 'left',
+                              background: on ? 'linear-gradient(135deg, rgba(124,58,237,0.45), rgba(109,40,217,0.28))' : 'rgba(255,255,255,0.03)',
+                              border: on ? '1px solid rgba(168,85,247,0.55)' : '1px solid rgba(255,255,255,0.06)',
+                              color: on ? '#f0e0ff' : 'rgba(148,163,184,0.5)',
+                              boxShadow: on ? '0 0 12px rgba(124,58,237,0.35), inset 0 1px 0 rgba(255,255,255,0.06)' : 'none',
+                              textShadow: on ? '0 0 8px rgba(168,85,247,0.7)' : 'none',
+                            }}>
+                            <span style={{ opacity: 0.5, marginRight: 5, fontSize: '0.65rem' }}>{idx + 1}</span>
+                            {v}
+                          </button>
+                        )
+                      })
+                    })()}
+                  </div>
                 </div>
               </div>
             )}
