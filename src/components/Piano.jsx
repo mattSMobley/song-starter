@@ -40,6 +40,7 @@ export default function Piano({
   onNoteOn,
   onNoteOff,
   compact = false,
+  clipEnd = null, // e.g. "F5" — trims display to only show mapped keys
 }) {
   const [activeNotes, setActiveNotes] = useState(new Set())
   const heldKeys = useRef(new Map()) // key → note (so keyup always releases the right note)
@@ -74,8 +75,22 @@ export default function Piano({
 
     const down = (e) => {
       if (e.repeat || e.metaKey || e.ctrlKey || e.altKey) return
-      if (e.key === 'Tab') { e.preventDefault(); shiftRef.current = 1; setOctaveShift(1); return }
-      if (e.key === '`') { shiftRef.current = -1; setOctaveShift(-1); return }
+      // Caps Lock — toggle down one octave (LED confirms state)
+      if (e.key === 'CapsLock') {
+        const next = shiftRef.current === -1 ? 0 : -1
+        if (next === 0) releaseAllHeld()
+        shiftRef.current = next
+        setOctaveShift(next)
+        return
+      }
+      // Backtick — toggle up one octave
+      if (e.key === '`') {
+        const next = shiftRef.current === 1 ? 0 : 1
+        if (next === 0) releaseAllHeld()
+        shiftRef.current = next
+        setOctaveShift(next)
+        return
+      }
       const keyMap = buildKeyMap(octaveStart + shiftRef.current)
       const note = keyMap[e.key]
       if (note && !heldKeys.current.has(e.key)) {
@@ -85,12 +100,6 @@ export default function Piano({
     }
 
     const up = (e) => {
-      if (e.key === 'Tab' || e.key === '`') {
-        releaseAllHeld()
-        shiftRef.current = 0
-        setOctaveShift(0)
-        return
-      }
       const note = heldKeys.current.get(e.key)
       if (note) {
         heldKeys.current.delete(e.key)
@@ -135,7 +144,20 @@ export default function Piano({
     }
   }
 
-  const { whites, blacks } = buildKeys(octaveStart, numOctaves)
+  const { whites: allWhites, blacks: allBlacks } = buildKeys(octaveStart, numOctaves)
+
+  // Clip to only show keys that have keyboard mappings
+  let whites = allWhites
+  let blacks = allBlacks
+  if (clipEnd) {
+    const clipIdx = allWhites.findIndex(w => w.note === clipEnd)
+    if (clipIdx !== -1) {
+      whites = allWhites.slice(0, clipIdx + 1)
+      const maxIdx = whites[whites.length - 1].whiteIdx
+      blacks = allBlacks.filter(b => b.afterWhite <= maxIdx)
+    }
+  }
+
   const WHITE_W = compact ? 30 : 42
   const WHITE_H = compact ? 110 : 140
   const BLACK_W = compact ? 19 : 26
@@ -153,10 +175,10 @@ export default function Piano({
           </span>
           {octaveShift !== 0 ? (
             <span style={{ color: '#22d3ee', fontWeight: 700, letterSpacing: '0.05em' }}>
-              {octaveShift > 0 ? '▲ +1 oct' : '▼ −1 oct'}
+              {octaveShift > 0 ? '▲ +1 oct  [` again to reset]' : '▼ −1 oct  [⇪ again to reset]'}
             </span>
           ) : (
-            <span style={{ color: 'rgba(148,163,184,0.3)' }}>hold ` / Tab to shift oct</span>
+            <span style={{ color: 'rgba(148,163,184,0.3)' }}>⇪ Caps Lock / ` to shift oct</span>
           )}
         </div>
       )}

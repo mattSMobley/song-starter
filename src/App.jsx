@@ -793,6 +793,7 @@ export default function App() {
                   <div className="flex flex-col gap-3" style={{ overflowX: 'auto', flex: 1, minWidth: 0 }}>
                     <Piano
                       octaveStart={octave} numOctaves={2} keyboardMode={keyboardMode}
+                      clipEnd={`F${octave + 1}`}
                       highlightNotes={scaleHighlights}
                       chordNotes={chordHighlights}
                       onNoteOn={handlePianoNoteOn}
