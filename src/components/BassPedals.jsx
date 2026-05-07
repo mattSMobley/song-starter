@@ -23,8 +23,8 @@ export default function BassPedals({
   const [activeNotes, setActiveNotes] = useState(new Set())
   const heldKeys = useRef(new Set())
 
-  const activate = useCallback(async (note) => {
-    await Tone.start()
+  const activate = useCallback((note) => {
+    Tone.start()
     setActiveNotes(prev => new Set([...prev, note]))
     noteOn(note)
     onNoteOn?.(note)

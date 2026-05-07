@@ -56,8 +56,8 @@ export default function Piano({
   const heldKeys = useRef(new Map()) // key → note
   const touchNoteRef = useRef(null)
 
-  const activate = useCallback(async (note) => {
-    await Tone.start()
+  const activate = useCallback((note) => {
+    Tone.start() // fire-and-forget — context already running after first interaction
     setActiveNotes(prev => new Set([...prev, note]))
     noteOn(note)
     onNoteOn?.(note)
