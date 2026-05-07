@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "node scripts/gen-og.mjs && vite build",
+    "gen-og": "node scripts/gen-og.mjs",
     "lint": "eslint .",
     "preview": "vite preview"
   },
@@ -17,6 +18,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.13.0",
+    "@resvg/resvg-js": "^2.6.2",
     "@tailwindcss/vite": "^4.2.4",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
