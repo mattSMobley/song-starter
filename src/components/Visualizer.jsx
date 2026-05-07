@@ -13,7 +13,7 @@ export default function Visualizer() {
       rafRef.current = requestAnimationFrame(draw)
       const W = canvas.width
       const H = canvas.height
-      const data = analyser.getValue()
+      const data = analyser ? analyser.getValue() : new Float32Array(256).fill(0)
 
       ctx.clearRect(0, 0, W, H)
       ctx.fillStyle = 'rgba(10,10,15,0.3)'

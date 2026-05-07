@@ -2,14 +2,23 @@ import * as Tone from 'tone'
 import { sendNoteOn, sendNoteOff } from './midiOut.js'
 
 // ── Shared analyser (exported for Visualizer) ────────────────────────────────
-export const analyser = new Tone.Analyser('waveform', 256)
+export let analyser = null
 
-// ── Effects chain ────────────────────────────────────────────────────────────
-const reverb  = new Tone.Reverb({ decay: 2.5, wet: 0.25 }).toDestination()
-const delay   = new Tone.FeedbackDelay({ delayTime: '8n', feedback: 0.25, wet: 0.15 }).connect(reverb)
-const chorus  = new Tone.Chorus({ frequency: 2, delayTime: 3.5, depth: 0.4, wet: 0.3 }).connect(delay)
-const limiter = new Tone.Limiter(-3)
-limiter.fan(chorus, analyser)
+// ── Effects chain (lazy — created after user gesture to unblock iOS) ─────────
+let reverb, delay, chorus, limiter
+let audioInitialized = false
+
+function initAudioGraph() {
+  if (audioInitialized) return
+  audioInitialized = true
+  analyser = new Tone.Analyser('waveform', 256)
+  reverb  = new Tone.Reverb({ decay: 2.5, wet: 0.25 }).toDestination()
+  delay   = new Tone.FeedbackDelay({ delayTime: '8n', feedback: 0.25, wet: 0.15 }).connect(reverb)
+  chorus  = new Tone.Chorus({ frequency: 2, delayTime: 3.5, depth: 0.4, wet: 0.3 }).connect(delay)
+  limiter = new Tone.Limiter(-3)
+  limiter.fan(chorus, analyser)
+  initDrums()
+}
 
 // ── Instrument presets: 7 instruments × 5 variations ─────────────────────────
 const INSTRUMENT_PRESETS = {
@@ -89,40 +98,40 @@ const INSTRUMENT_PRESETS = {
   ],
 
   strings: [
-    // Violin — FM bowed character
+    // Ensemble — 6-voice wide-spread detuned sawtooth, slow bow attack
+    () => new Tone.PolySynth(Tone.Synth, {
+      oscillator: { type: 'fatsawtooth', spread: 58, count: 6 },
+      envelope: { attack: 0.55, decay: 0.05, sustain: 0.95, release: 3.5 },
+      volume: -14,
+    }),
+    // Cello — warm deep FM, slow bow drag
     () => new Tone.PolySynth(Tone.FMSynth, {
-      harmonicity: 3.5, modulationIndex: 1.5,
-      oscillator: { type: 'triangle4' },
-      envelope: { attack: 0.3, decay: 0.1, sustain: 1.0, release: 1.8 },
-      modulation: { type: 'sawtooth' },
-      modulationEnvelope: { attack: 0.01, decay: 0.5, sustain: 0.1, release: 1.5 },
+      harmonicity: 2.0, modulationIndex: 2.5,
+      oscillator: { type: 'sawtooth4' },
+      envelope: { attack: 0.45, decay: 0.0, sustain: 1.0, release: 2.8 },
+      modulation: { type: 'triangle' },
+      modulationEnvelope: { attack: 0.1, decay: 0.6, sustain: 0.25, release: 2.5 },
       volume: -6,
     }),
-    // Cello — deeper FM, slower bow
+    // Violin — bright FM with bow expression
     () => new Tone.PolySynth(Tone.FMSynth, {
-      harmonicity: 2.5, modulationIndex: 2.0,
-      oscillator: { type: 'sawtooth4' },
-      envelope: { attack: 0.5, decay: 0.1, sustain: 1.0, release: 2.2 },
-      modulation: { type: 'triangle' },
-      modulationEnvelope: { attack: 0.02, decay: 0.8, sustain: 0.2, release: 2.0 },
-      volume: -7,
+      harmonicity: 3.8, modulationIndex: 1.3,
+      oscillator: { type: 'triangle4' },
+      envelope: { attack: 0.28, decay: 0.02, sustain: 1.0, release: 2.2 },
+      modulation: { type: 'sawtooth' },
+      modulationEnvelope: { attack: 0.06, decay: 0.5, sustain: 0.15, release: 1.8 },
+      volume: -5,
     }),
-    // Chamber — ensemble, fat sawtooth
+    // Lush — cinematic orchestra swell, 8-voice ultra-wide
     () => new Tone.PolySynth(Tone.Synth, {
-      oscillator: { type: 'fatsawtooth', spread: 25, count: 3 },
-      envelope: { attack: 0.4, decay: 0.1, sustain: 0.9, release: 2.5 },
-      volume: -9,
+      oscillator: { type: 'fatsawtooth', spread: 88, count: 8 },
+      envelope: { attack: 1.0, decay: 0.1, sustain: 0.92, release: 5.0 },
+      volume: -18,
     }),
-    // Lush — ultra-wide ensemble detuning, slow cinematic swell
-    () => new Tone.PolySynth(Tone.Synth, {
-      oscillator: { type: 'fatsawtooth', spread: 80, count: 6 },
-      envelope: { attack: 1.2, decay: 0.2, sustain: 0.88, release: 4.5 },
-      volume: -13,
-    }),
-    // Pizz — plucked strings
+    // Pizz — plucked with more body
     () => new Tone.PolySynth(Tone.Synth, {
       oscillator: { type: 'triangle8' },
-      envelope: { attack: 0.001, decay: 0.4, sustain: 0.05, release: 0.8 },
+      envelope: { attack: 0.003, decay: 0.55, sustain: 0.02, release: 1.0 },
       volume: -6,
     }),
   ],
@@ -173,20 +182,28 @@ const INSTRUMENT_PRESETS = {
   ],
 
   pluck: [
-    // Guitar — classic PluckSynth
-    () => new Tone.PluckSynth({ attackNoise: 1.2, dampening: 3800, resonance: 0.97, volume: -4 }),
-    // Harp — triangle with long resonant decay, bell-like (distinct from PluckSynth guitar)
+    // Acoustic ✦ — sampler swaps in when loaded; triangle fallback until then
+    () => new Tone.PolySynth(Tone.Synth, {
+      oscillator: { type: 'triangle' },
+      envelope: { attack: 0.001, decay: 1.2, sustain: 0.0, release: 1.5 },
+      volume: -4,
+    }),
+    // Nylon — soft warm classical guitar character
+    () => new Tone.PolySynth(Tone.Synth, {
+      oscillator: { type: 'triangle8' },
+      envelope: { attack: 0.001, decay: 0.9, sustain: 0.02, release: 1.2 },
+      volume: -5,
+    }),
+    // Electric — bright steel-string pluck
+    () => new Tone.PolySynth(Tone.Synth, {
+      oscillator: { type: 'fatsawtooth', spread: 12, count: 2 },
+      envelope: { attack: 0.001, decay: 0.6, sustain: 0.03, release: 0.8 },
+      volume: -6,
+    }),
+    // Harp — triangle with long resonant decay
     () => new Tone.PolySynth(Tone.Synth, {
       oscillator: { type: 'triangle' },
       envelope: { attack: 0.001, decay: 3.0, sustain: 0.0, release: 1.8 },
-      volume: -5,
-    }),
-    // Koto — sharp attack, mid dampening
-    () => new Tone.PluckSynth({ attackNoise: 2.5, dampening: 2800, resonance: 0.95, volume: -4 }),
-    // Kalimba — very short, metallic tine
-    () => new Tone.PolySynth(Tone.Synth, {
-      oscillator: { type: 'sine' },
-      envelope: { attack: 0.001, decay: 0.6, sustain: 0.0, release: 0.5 },
       volume: -5,
     }),
     // Sitar — FM pluck with buzz
@@ -201,40 +218,40 @@ const INSTRUMENT_PRESETS = {
   ],
 
   bass: [
-    // Round — classic sub bass
-    () => new Tone.MonoSynth({
-      oscillator: { type: 'square4' },
-      envelope: { attack: 0.04, decay: 0.2, sustain: 0.8, release: 0.5 },
-      filterEnvelope: { attack: 0.04, decay: 0.2, sustain: 0.5, release: 0.4, baseFrequency: 200, octaves: 3 },
+    // Finger — warm fingerstyle, triangle + smooth low filter
+    () => new Tone.PolySynth(Tone.MonoSynth, {
+      oscillator: { type: 'triangle' },
+      envelope: { attack: 0.03, decay: 0.1, sustain: 0.9, release: 0.4 },
+      filterEnvelope: { attack: 0.03, decay: 0.2, sustain: 0.7, release: 0.3, baseFrequency: 180, octaves: 2.5 },
       volume: -4,
     }),
-    // Sub — pure sine, deep
-    () => new Tone.MonoSynth({
-      oscillator: { type: 'sine' },
-      envelope: { attack: 0.06, decay: 0.3, sustain: 0.9, release: 0.6 },
-      filterEnvelope: { attack: 0.06, decay: 0.3, sustain: 0.8, release: 0.5, baseFrequency: 80, octaves: 2 },
-      volume: -3,
-    }),
-    // Slap — snappy attack, tight decay
-    () => new Tone.MonoSynth({
-      oscillator: { type: 'sawtooth' },
-      envelope: { attack: 0.001, decay: 0.1, sustain: 0.4, release: 0.3 },
-      filterEnvelope: { attack: 0.001, decay: 0.15, sustain: 0.2, release: 0.3, baseFrequency: 300, octaves: 4 },
-      volume: -4,
-    }),
-    // Synth — fat lead bass with filter
-    () => new Tone.MonoSynth({
-      oscillator: { type: 'fatsawtooth', spread: 20, count: 2 },
-      envelope: { attack: 0.02, decay: 0.3, sustain: 0.7, release: 0.5 },
-      filterEnvelope: { attack: 0.02, decay: 0.3, sustain: 0.4, release: 0.4, baseFrequency: 150, octaves: 4 },
+    // Pick — sawtooth, crisp bright attack
+    () => new Tone.PolySynth(Tone.MonoSynth, {
+      oscillator: { type: 'sawtooth4' },
+      envelope: { attack: 0.005, decay: 0.12, sustain: 0.75, release: 0.35 },
+      filterEnvelope: { attack: 0.005, decay: 0.25, sustain: 0.55, release: 0.3, baseFrequency: 350, octaves: 3 },
       volume: -6,
     }),
-    // Growl — sawtooth with huge 8-octave filter sweep for aggressive growl
-    () => new Tone.MonoSynth({
+    // Slap — snappy pop, tight filter burst
+    () => new Tone.PolySynth(Tone.MonoSynth, {
       oscillator: { type: 'sawtooth' },
-      envelope: { attack: 0.02, decay: 0.15, sustain: 0.5, release: 0.4 },
-      filterEnvelope: { attack: 0.003, decay: 0.6, sustain: 0.05, release: 0.5, baseFrequency: 55, octaves: 8 },
+      envelope: { attack: 0.001, decay: 0.08, sustain: 0.35, release: 0.25 },
+      filterEnvelope: { attack: 0.001, decay: 0.12, sustain: 0.15, release: 0.25, baseFrequency: 400, octaves: 4.5 },
       volume: -5,
+    }),
+    // Fretless — smooth triangle, sings between notes
+    () => new Tone.PolySynth(Tone.MonoSynth, {
+      oscillator: { type: 'triangle4' },
+      envelope: { attack: 0.06, decay: 0.1, sustain: 0.95, release: 0.6 },
+      filterEnvelope: { attack: 0.06, decay: 0.3, sustain: 0.8, release: 0.5, baseFrequency: 120, octaves: 2 },
+      volume: -5,
+    }),
+    // Sub — pure sine, deep felt not heard
+    () => new Tone.PolySynth(Tone.MonoSynth, {
+      oscillator: { type: 'sine' },
+      envelope: { attack: 0.06, decay: 0.3, sustain: 0.9, release: 0.6 },
+      filterEnvelope: { attack: 0.06, decay: 0.3, sustain: 0.85, release: 0.5, baseFrequency: 70, octaves: 1.5 },
+      volume: -3,
     }),
   ],
 
@@ -277,35 +294,40 @@ const INSTRUMENT_PRESETS = {
   ],
 }
 
-// ── Drum kit (always alive, not swapped with instrument) ──────────────────────
-const drumReverb = new Tone.Reverb({ decay: 1.2, wet: 0.12 }).toDestination()
-const drumKick = new Tone.MembraneSynth({
-  pitchDecay: 0.05, octaves: 7,
-  envelope: { attack: 0.001, decay: 0.35, sustain: 0, release: 0.1 },
-  volume: -2,
-}).connect(drumReverb)
-const drumSnare = new Tone.NoiseSynth({
-  noise: { type: 'white' },
-  envelope: { attack: 0.001, decay: 0.16, sustain: 0, release: 0.05 },
-  volume: -6,
-}).connect(drumReverb)
-const drumHihatC = new Tone.MetalSynth({
-  frequency: 400, harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5,
-  envelope: { attack: 0.001, decay: 0.07, release: 0.01 },
-  volume: -14,
-}).connect(drumReverb)
-const drumHihatO = new Tone.MetalSynth({
-  frequency: 400, harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5,
-  envelope: { attack: 0.001, decay: 0.28, release: 0.08 },
-  volume: -16,
-}).connect(drumReverb)
-const drumCrash = new Tone.MetalSynth({
-  frequency: 300, harmonicity: 5.1, modulationIndex: 64, resonance: 4000, octaves: 3,
-  envelope: { attack: 0.001, decay: 1.2, release: 0.4 },
-  volume: -16,
-}).connect(drumReverb)
+// ── Drum kit (lazy — initialized with the rest of the audio graph) ────────────
+let drumKick, drumSnare, drumHihatC, drumHihatO, drumCrash
+
+function initDrums() {
+  const drumReverb = new Tone.Reverb({ decay: 1.2, wet: 0.12 }).toDestination()
+  drumKick = new Tone.MembraneSynth({
+    pitchDecay: 0.05, octaves: 7,
+    envelope: { attack: 0.001, decay: 0.35, sustain: 0, release: 0.1 },
+    volume: -2,
+  }).connect(drumReverb)
+  drumSnare = new Tone.NoiseSynth({
+    noise: { type: 'white' },
+    envelope: { attack: 0.001, decay: 0.16, sustain: 0, release: 0.05 },
+    volume: -6,
+  }).connect(drumReverb)
+  drumHihatC = new Tone.MetalSynth({
+    frequency: 400, harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5,
+    envelope: { attack: 0.001, decay: 0.07, release: 0.01 },
+    volume: -14,
+  }).connect(drumReverb)
+  drumHihatO = new Tone.MetalSynth({
+    frequency: 400, harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5,
+    envelope: { attack: 0.001, decay: 0.28, release: 0.08 },
+    volume: -16,
+  }).connect(drumReverb)
+  drumCrash = new Tone.MetalSynth({
+    frequency: 300, harmonicity: 5.1, modulationIndex: 64, resonance: 4000, octaves: 3,
+    envelope: { attack: 0.001, decay: 1.2, release: 0.4 },
+    volume: -16,
+  }).connect(drumReverb)
+}
 
 export function playDrumHit(type, time) {
+  if (!drumKick) return
   try {
     const t = time ?? Tone.now()
     if (type === 'kick')            drumKick.triggerAttackRelease('C1', '8n', t)
@@ -330,9 +352,114 @@ const SALA_URLS = {
   'A7':'A7.mp3',  'C8':'C8.mp3',
 }
 
+const NB_BASE = 'https://nbrosowsky.github.io/tonejs-instruments/samples/'
+
 // key = `${instrumentId}-${variationIdx}`
 const SAMPLER_CONFIGS = {
   'keys-0': { baseUrl: SALA_BASE, urls: SALA_URLS, volume: -6 },
+
+  // Guitar family — acoustic, nylon, electric, harp
+  'pluck-0': {
+    baseUrl: NB_BASE + 'guitar-acoustic/',
+    urls: {
+      'A1':'A1.mp3', 'C2':'C2.mp3', 'Eb2':'Eb2.mp3', 'Gb2':'Gb2.mp3',
+      'A2':'A2.mp3', 'C3':'C3.mp3', 'Eb3':'Eb3.mp3', 'Gb3':'Gb3.mp3',
+      'A3':'A3.mp3', 'C4':'C4.mp3', 'Eb4':'Eb4.mp3', 'Gb4':'Gb4.mp3',
+      'A4':'A4.mp3', 'C5':'C5.mp3',
+    }, volume: -4,
+  },
+  'pluck-1': {
+    baseUrl: NB_BASE + 'guitar-nylon/',
+    urls: {
+      'B1':'B1.mp3', 'B2':'B2.mp3', 'B3':'B3.mp3', 'B4':'B4.mp3',
+      'D2':'D2.mp3', 'D3':'D3.mp3',
+      'E2':'E2.mp3', 'E3':'E3.mp3', 'E4':'E4.mp3', 'E5':'E5.mp3',
+      'F#2':'Fs2.mp3', 'F#3':'Fs3.mp3', 'F#4':'Fs4.mp3', 'F#5':'Fs5.mp3',
+      'G3':'G3.mp3', 'C#3':'Cs3.mp3', 'C#4':'Cs4.mp3', 'C#5':'Cs5.mp3',
+    }, volume: -4,
+  },
+  'pluck-2': {
+    baseUrl: NB_BASE + 'guitar-electric/',
+    urls: {
+      'A2':'A2.mp3', 'A3':'A3.mp3', 'A4':'A4.mp3', 'A5':'A5.mp3',
+      'C2':'C2.mp3', 'C3':'C3.mp3', 'C4':'C4.mp3', 'C5':'C5.mp3', 'C6':'C6.mp3',
+      'E2':'E2.mp3',
+      'F#2':'Fs2.mp3', 'F#3':'Fs3.mp3', 'F#4':'Fs4.mp3', 'F#5':'Fs5.mp3',
+      'D#3':'Ds3.mp3', 'D#4':'Ds4.mp3', 'D#5':'Ds5.mp3',
+    }, volume: -4,
+  },
+  'pluck-3': {
+    baseUrl: NB_BASE + 'harp/',
+    urls: {
+      'A2':'A2.mp3', 'A4':'A4.mp3', 'A6':'A6.mp3',
+      'B1':'B1.mp3', 'B3':'B3.mp3', 'B5':'B5.mp3', 'B6':'B6.mp3',
+      'C3':'C3.mp3', 'C5':'C5.mp3',
+      'D2':'D2.mp3', 'D4':'D4.mp3', 'D6':'D6.mp3',
+      'E1':'E1.mp3', 'E3':'E3.mp3', 'E5':'E5.mp3',
+      'F2':'F2.mp3', 'F4':'F4.mp3', 'F6':'F6.mp3',
+      'G1':'G1.mp3', 'G3':'G3.mp3', 'G5':'G5.mp3',
+    }, volume: -5,
+  },
+
+  // Bass — electric fingerstyle
+  'bass-0': {
+    baseUrl: NB_BASE + 'bass-electric/',
+    urls: {
+      'A#1':'As1.mp3', 'A#2':'As2.mp3', 'A#3':'As3.mp3', 'A#4':'As4.mp3',
+      'C#1':'Cs1.mp3', 'C#2':'Cs2.mp3', 'C#3':'Cs3.mp3', 'C#4':'Cs4.mp3',
+      'E1':'E1.mp3',   'E2':'E2.mp3',   'E3':'E3.mp3',   'E4':'E4.mp3',
+      'G1':'G1.mp3',   'G2':'G2.mp3',   'G3':'G3.mp3',   'G4':'G4.mp3',
+    }, volume: -4,
+  },
+
+  // Strings — real bowed instruments
+  'strings-1': {
+    baseUrl: NB_BASE + 'cello/',
+    urls: {
+      'C2':'C2.mp3', 'C3':'C3.mp3', 'C4':'C4.mp3', 'C5':'C5.mp3',
+      'D2':'D2.mp3', 'D3':'D3.mp3', 'D4':'D4.mp3',
+      'E2':'E2.mp3', 'E3':'E3.mp3', 'E4':'E4.mp3',
+      'G2':'G2.mp3', 'G3':'G3.mp3', 'G4':'G4.mp3',
+      'F2':'F2.mp3', 'F3':'F3.mp3', 'F4':'F4.mp3',
+    }, volume: -6,
+  },
+  'strings-2': {
+    baseUrl: NB_BASE + 'violin/',
+    urls: {
+      'A3':'A3.mp3', 'A4':'A4.mp3', 'A5':'A5.mp3', 'A6':'A6.mp3',
+      'C4':'C4.mp3', 'C5':'C5.mp3', 'C6':'C6.mp3', 'C7':'C7.mp3',
+      'E4':'E4.mp3', 'E5':'E5.mp3', 'E6':'E6.mp3',
+      'G3':'G3.mp3', 'G4':'G4.mp3', 'G5':'G5.mp3', 'G6':'G6.mp3',
+    }, volume: -6,
+  },
+
+  // Lead — real wind instrument
+  'lead-3': {
+    baseUrl: NB_BASE + 'flute/',
+    urls: {
+      'A4':'A4.mp3', 'A5':'A5.mp3', 'A6':'A6.mp3',
+      'C4':'C4.mp3', 'C5':'C5.mp3', 'C6':'C6.mp3', 'C7':'C7.mp3',
+      'E4':'E4.mp3', 'E5':'E5.mp3', 'E6':'E6.mp3',
+    }, volume: -6,
+  },
+
+  // Choir — gleitz MIDI soundfonts (CDN-hosted GM samples)
+  'choir-0': {
+    baseUrl: 'https://gleitz.github.io/midi-js-soundfonts/MusyngKite/choir_aahs-mp3/',
+    urls: {
+      'C3':'C3.mp3', 'E3':'E3.mp3', 'G3':'G3.mp3', 'Bb3':'Bb3.mp3',
+      'C4':'C4.mp3', 'E4':'E4.mp3', 'G4':'G4.mp3', 'Bb4':'Bb4.mp3',
+      'C5':'C5.mp3', 'E5':'E5.mp3', 'G5':'G5.mp3',
+    }, volume: -8,
+  },
+  'choir-1': {
+    baseUrl: 'https://gleitz.github.io/midi-js-soundfonts/MusyngKite/voice_oohs-mp3/',
+    urls: {
+      'C3':'C3.mp3', 'E3':'E3.mp3', 'G3':'G3.mp3', 'Bb3':'Bb3.mp3',
+      'C4':'C4.mp3', 'E4':'E4.mp3', 'G4':'G4.mp3', 'Bb4':'Bb4.mp3',
+      'C5':'C5.mp3', 'E5':'E5.mp3', 'G5':'G5.mp3',
+    }, volume: -8,
+  },
 }
 
 const samplerCache = {}
@@ -393,6 +520,7 @@ function loadSamplerAsync(name, variation) {
 
 export async function startAudio() {
   await Tone.start()
+  initAudioGraph()
   if (!activeSynth) buildSynth('keys', 0)
 }
 
@@ -425,7 +553,7 @@ export function noteOn(note) {
 export function noteOff(note) {
   if (!activeSynth) return
   try {
-    if (activeSynth instanceof Tone.PolySynth) {
+    if (activeSynth instanceof Tone.PolySynth || activeSynth instanceof Tone.Sampler) {
       activeSynth.triggerRelease(note)
     } else {
       activeSynth.triggerRelease()
@@ -445,9 +573,9 @@ export function getTempo() {
 export const INSTRUMENTS = [
   { id: 'keys',    label: 'Keys',    icon: '🎹', variations: ['Piano ✦', 'E. Piano', 'Organ', 'Clav', 'Vibes'] },
   { id: 'pad',     label: 'Pad',     icon: '🌊', variations: ['Warm', 'Crystal', 'Aether', 'Pulse', 'Glass'] },
-  { id: 'strings', label: 'Strings', icon: '🎻', variations: ['Violin', 'Cello', 'Chamber', 'Lush', 'Pizz'] },
+  { id: 'strings', label: 'Strings', icon: '🎻', variations: ['Ensemble', 'Cello', 'Violin', 'Lush', 'Pizz'] },
   { id: 'choir',   label: 'Choir',   icon: '🎤', variations: ['Ah', 'Ooh', 'Hmm', 'Oh', 'Angel'] },
-  { id: 'pluck',   label: 'Pluck',   icon: '🪕', variations: ['Guitar', 'Harp', 'Koto', 'Kalimba', 'Sitar'] },
-  { id: 'bass',    label: 'Bass',    icon: '🎸', variations: ['Round', 'Sub', 'Slap', 'Synth', 'Growl'] },
+  { id: 'pluck',   label: 'Guitar',  icon: '🪕', variations: ['Acoustic ✦', 'Nylon', 'Electric', 'Harp', 'Sitar'] },
+  { id: 'bass',    label: 'Bass',    icon: '🎸', variations: ['Finger', 'Pick', 'Slap', 'Fretless', 'Sub'] },
   { id: 'lead',    label: 'Lead',    icon: '🎺', variations: ['Soft', 'Bright', 'Sync', 'Flute', 'Acid'] },
 ]

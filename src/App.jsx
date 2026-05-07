@@ -9,12 +9,13 @@ import SplashCanvas from './components/SplashCanvas.jsx'
 import BrowseTab from './components/BrowseTab.jsx'
 import ChordDisplay from './components/ChordDisplay.jsx'
 import ChordProgressionPanel from './components/ChordProgressionPanel.jsx'
+import SessionTab from './components/SessionTab.jsx'
 import { startAudio, setInstrument, playNote, onSamplerLoading, setTempo, INSTRUMENTS } from './audio/engine.js'
 import { initMidi, getMidiOutputs, selectOutput, setMidiChannel, getMidiChannel, isMidiActive, getSelectedOutputId, onOutputsChange } from './audio/midiOut.js'
 import { ROOTS, SCALE_NAMES } from './audio/scales.js'
 import { generateVariations } from './audio/melodyGen.js'
 
-const TABS = ['Generate', 'Chords', 'Browse', 'Inventory', 'Record']
+const TABS = ['Generate', 'Chords', 'Session', 'Browse', 'Inventory', 'Record']
 
 export default function App() {
   const [started, setStarted] = useState(false)
@@ -961,7 +962,7 @@ export default function App() {
                       )}
                     </div>
                   </div>
-                  <div className="flex-1 overflow-y-auto">
+                  <div className="flex-1 overflow-y-auto min-h-0">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-4" style={{ gridAutoRows: 'min-content' }}>
                       {melodies.map((melody, i) => (
                         <MelodyCard key={i} melody={melody} index={i} bpm={bpm} onSave={handleSaveMelody}
@@ -975,6 +976,11 @@ export default function App() {
               {/* Chords */}
               {activeTab === 'Chords' && (
                 <ChordProgressionPanel root={root} scale={scale} bpm={bpm} />
+              )}
+
+              {/* Session */}
+              {activeTab === 'Session' && (
+                <SessionTab root={root} scale={scale} bpm={bpm} />
               )}
 
               {/* Browse */}
@@ -995,7 +1001,7 @@ export default function App() {
                       </p>
                     </div>
                   </div>
-                  <div className="flex-1 overflow-y-auto">
+                  <div className="flex-1 overflow-y-auto min-h-0">
                     <LoopInventory loops={loops} onDelete={handleDeleteLoop} bpm={bpm} />
                   </div>
                 </div>

@@ -2,12 +2,14 @@ import { useEffect, useCallback, useState, useRef } from 'react'
 import * as Tone from 'tone'
 import { noteOn, noteOff } from '../audio/engine.js'
 
-const KEY_MAP = {
-  'a': 'C4',  'w': 'C#4', 's': 'D4',  'e': 'D#4', 'd': 'E4',
-  'f': 'F4',  't': 'F#4', 'g': 'G4',  'y': 'G#4', 'h': 'A4',
-  'u': 'A#4', 'j': 'B4',
-  'k': 'C5',  'o': 'C#5', 'l': 'D5',  'p': 'D#5', ';': 'E5',
-  "'": 'F5',
+function buildKeyMap(o) {
+  return {
+    'a': `C${o}`,   'w': `C#${o}`,  's': `D${o}`,   'e': `D#${o}`,  'd': `E${o}`,
+    'f': `F${o}`,   't': `F#${o}`,  'g': `G${o}`,   'y': `G#${o}`,  'h': `A${o}`,
+    'u': `A#${o}`,  'j': `B${o}`,
+    'k': `C${o+1}`, 'o': `C#${o+1}`,'l': `D${o+1}`, 'p': `D#${o+1}`,';': `E${o+1}`,
+    "'": `F${o+1}`,
+  }
 }
 
 const WHITE_NOTES = ['C','D','E','F','G','A','B']
@@ -38,7 +40,7 @@ export default function Piano({
   compact = false,
 }) {
   const [activeNotes, setActiveNotes] = useState(new Set())
-  const heldKeys = new Set()
+  const heldKeys = useRef(new Set())
   const touchNoteRef = useRef(null)
 
   // Ensure AudioContext is running before every note — critical on mobile
@@ -57,18 +59,23 @@ export default function Piano({
 
   useEffect(() => {
     if (!keyboardMode) return
+    const keyMap = buildKeyMap(octaveStart)
+    // Clear stale held state when octave or mode changes
+    heldKeys.current.clear()
+    setActiveNotes(new Set())
+
     const down = (e) => {
       if (e.repeat || e.metaKey || e.ctrlKey || e.altKey) return
-      const note = KEY_MAP[e.key]
-      if (note && !heldKeys.has(e.key)) {
-        heldKeys.add(e.key)
+      const note = keyMap[e.key]
+      if (note && !heldKeys.current.has(e.key)) {
+        heldKeys.current.add(e.key)
         activate(note)
       }
     }
     const up = (e) => {
-      const note = KEY_MAP[e.key]
+      const note = keyMap[e.key]
       if (note) {
-        heldKeys.delete(e.key)
+        heldKeys.current.delete(e.key)
         deactivate(note)
       }
     }
@@ -78,7 +85,7 @@ export default function Piano({
       window.removeEventListener('keydown', down)
       window.removeEventListener('keyup', up)
     }
-  }, [keyboardMode, activate, deactivate])
+  }, [keyboardMode, octaveStart, activate, deactivate])
 
   // ── Touch helpers: all handled on the container so swipe works ──────────
   function noteFromPoint(x, y) {
