@@ -39,6 +39,16 @@ export default function App() {
   const [midiReady, setMidiReady] = useState(false)
   const [activeNotes, setActiveNotes] = useState(new Set())
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
+
+  const handlePianoNoteOn = useCallback((note) => {
+    recorderRef.current?.noteOn(note)
+    setActiveNotes(prev => new Set([...prev, note]))
+  }, [])
+
+  const handlePianoNoteOff = useCallback((note) => {
+    recorderRef.current?.noteOff(note)
+    setActiveNotes(prev => { const s = new Set(prev); s.delete(note); return s })
+  }, [])
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [playAllIdx, setPlayAllIdx] = useState(-1)
   const playAllRef = useRef(false)
@@ -698,14 +708,8 @@ export default function App() {
                   <ChordDisplay activeNotes={activeNotes} />
                   <Piano
                     compact octaveStart={octave} numOctaves={1} keyboardMode={false}
-                    onNoteOn={note => {
-                      recorderRef.current?.noteOn(note)
-                      setActiveNotes(prev => new Set([...prev, note]))
-                    }}
-                    onNoteOff={note => {
-                      recorderRef.current?.noteOff(note)
-                      setActiveNotes(prev => { const s = new Set(prev); s.delete(note); return s })
-                    }}
+                    onNoteOn={handlePianoNoteOn}
+                    onNoteOff={handlePianoNoteOff}
                   />
                 </div>
                 {/* Variation pills — horizontal scroll */}
@@ -742,14 +746,8 @@ export default function App() {
                 <div className="flex-shrink-0">
                   <Piano
                     octaveStart={octave} numOctaves={2} keyboardMode={keyboardMode}
-                    onNoteOn={note => {
-                      recorderRef.current?.noteOn(note)
-                      setActiveNotes(prev => new Set([...prev, note]))
-                    }}
-                    onNoteOff={note => {
-                      recorderRef.current?.noteOff(note)
-                      setActiveNotes(prev => { const s = new Set(prev); s.delete(note); return s })
-                    }}
+                    onNoteOn={handlePianoNoteOn}
+                    onNoteOff={handlePianoNoteOff}
                   />
                 </div>
 
