@@ -35,22 +35,25 @@ function initAudioGraph() {
   analyser  = new Tone.Analyser('waveform', 256)
   masterOut = new Tone.Gain(1).toDestination()
 
-  delay = new Tone.FeedbackDelay({ delayTime: '8n', feedback: 0.25, wet: 0.15 })
-  delay.connect(masterOut)
+  limiter = new Tone.Limiter(-3)
 
-  // Reverb skipped on iOS — its OfflineAudioContext can re-suspend the main
-  // AudioContext. On desktop: parallel send so a null convolver buffer
-  // (another iOS failure mode) cannot silence the direct delay->masterOut path.
-  if (!isIOS) {
+  if (isIOS) {
+    // Tone.FeedbackDelay (DelayNode) silences audio on iOS Safari — skip it.
+    // Connect limiter directly to masterOut with no delay in the path.
+    limiter.connect(masterOut)
+    limiter.connect(analyser)
+    dbgLog('iOS: delay skipped, limiter -> masterOut direct')
+  } else {
+    delay = new Tone.FeedbackDelay({ delayTime: '8n', feedback: 0.25, wet: 0.15 })
+    delay.connect(masterOut)
     reverb = new Tone.Reverb({ decay: 2.5, wet: 1.0 })
     reverb.connect(masterOut)
     const reverbSend = new Tone.Gain(0.28)
     reverbSend.connect(reverb)
     delay.connect(reverbSend)
+    limiter.fan(delay, analyser)
   }
 
-  limiter = new Tone.Limiter(-3)
-  limiter.fan(delay, analyser)
   initDrums()
   dbgLog(`initAudioGraph done dest.vol=${Tone.getDestination().volume.value.toFixed(1)} mute=${Tone.getDestination().mute}`)
 }
