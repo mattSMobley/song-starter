@@ -566,11 +566,34 @@ function loadSamplerAsync(name, variation) {
 }
 
 export async function startAudio() {
+  // iOS: call audio.play() synchronously BEFORE any await so it happens inside
+  // the user-gesture stack. This switches the iOS audio session from "ambient"
+  // (muted by the silent/ringer switch) to "playback" (not muted).
+  // Web Audio alone stays in "ambient" on iOS — HTML5 media play() is the only
+  // way to promote the session. Must precede the first await.
+  if (isIOS) {
+    try {
+      // Minimal valid WAV: 1 silent sample at 44100 Hz
+      const wav = new Uint8Array([
+        0x52,0x49,0x46,0x46, 0x26,0x00,0x00,0x00, // RIFF, size=38
+        0x57,0x41,0x56,0x45,                       // WAVE
+        0x66,0x6d,0x74,0x20, 0x10,0x00,0x00,0x00, // fmt, size=16
+        0x01,0x00, 0x01,0x00,                      // PCM, mono
+        0x44,0xac,0x00,0x00, 0x88,0x58,0x01,0x00, // 44100 Hz, 88200 B/s
+        0x02,0x00, 0x10,0x00,                      // block=2, 16-bit
+        0x64,0x61,0x74,0x61, 0x02,0x00,0x00,0x00, // data, size=2
+        0x00,0x00,                                 // 1 silent sample
+      ])
+      const url = URL.createObjectURL(new Blob([wav], { type: 'audio/wav' }))
+      const el = new Audio(url)
+      el.play().then(() => URL.revokeObjectURL(url)).catch(() => URL.revokeObjectURL(url))
+      dbgLog('iOS playback session requested')
+    } catch (e) { dbgLog(`iOS session ERR: ${e.message}`) }
+  }
+
   dbgLog(`startAudio ctxState=${Tone.getContext().rawContext.state}`)
   await Tone.start()
   dbgLog(`Tone.start() done ctxState=${Tone.getContext().rawContext.state}`)
-  // iOS belt-and-suspenders: play a near-silent buffer to fully unlock
-  // the audio session (required on some iOS versions even after resume)
   try {
     const raw = Tone.getContext().rawContext
     const buf = raw.createBuffer(1, 1, raw.sampleRate)
