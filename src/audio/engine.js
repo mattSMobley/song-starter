@@ -38,11 +38,15 @@ function initAudioGraph() {
   limiter = new Tone.Limiter(-3)
 
   if (isIOS) {
-    // Tone.FeedbackDelay (DelayNode) silences audio on iOS Safari — skip it.
-    // Connect limiter directly to masterOut with no delay in the path.
+    // Tone.FeedbackDelay silences audio on iOS — skip it.
+    // Also bypass Tone.getDestination() and wire masterOut directly to the
+    // raw AudioContext destination (Tone's internal routing is suspect on iOS).
+    const rawDest = Tone.getContext().rawContext.destination
+    masterOut = new Tone.Gain(1)
+    masterOut.connect(rawDest)
     limiter.connect(masterOut)
     limiter.connect(analyser)
-    dbgLog('iOS: delay skipped, limiter -> masterOut direct')
+    dbgLog(`iOS: masterOut->rawCtx.dest direct, no delay`)
   } else {
     delay = new Tone.FeedbackDelay({ delayTime: '8n', feedback: 0.25, wet: 0.15 })
     delay.connect(masterOut)
