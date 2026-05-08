@@ -52,6 +52,7 @@ function initAudioGraph() {
   limiter = new Tone.Limiter(-3)
   limiter.fan(delay, analyser)
   initDrums()
+  dbgLog(`initAudioGraph done dest.vol=${Tone.getDestination().volume.value.toFixed(1)} mute=${Tone.getDestination().mute}`)
 }
 
 // ── Instrument presets: 7 instruments × 5 variations ─────────────────────────
@@ -630,7 +631,10 @@ export async function startAudio() {
 
 export function setInstrument(name, variation = 0) {
   buildSynth(name, variation)
-  loadSamplerAsync(name, variation)
+  // Skip sampler on iOS to test if PolySynth alone produces sound.
+  // If PolySynth works, Sampler is the culprit; if not, signal chain is broken.
+  if (!isIOS) loadSamplerAsync(name, variation)
+  dbgLog(`setInstrument ${name}[${variation}] sampler=${!isIOS}`)
 }
 
 export function playNoteAt(note, duration, time) {
@@ -648,12 +652,25 @@ export function playNote(note, duration = '8n') {
   } catch (e) { setTimeout(() => sendNoteOff(note), 400) }
 }
 
+let _analyserLogged = false
 export function noteOn(note) {
   if (!activeSynth) buildSynth(currentInstrument, currentVariation)
   const ctxState = Tone.getContext().rawContext.state
   const synthType = activeSynth?.constructor?.name ?? 'none'
   dbgLog(`noteOn ${note} ctx=${ctxState} synth=${synthType}`)
   try { activeSynth.triggerAttack(note) } catch (e) { dbgLog(`noteOn ERR: ${e.message}`) }
+  // Check analyser 80ms after trigger to see if signal flows past limiter
+  if (!_analyserLogged && analyser) {
+    _analyserLogged = true
+    setTimeout(() => {
+      try {
+        const vals = analyser.getValue()
+        const peak = Array.from(vals).reduce((m, v) => Math.max(m, Math.abs(v)), 0)
+        dbgLog(`analyser peak=${peak.toFixed(5)} (0=silent in chain)`)
+        _analyserLogged = false
+      } catch (e) {}
+    }, 80)
+  }
   sendNoteOn(note)
 }
 
