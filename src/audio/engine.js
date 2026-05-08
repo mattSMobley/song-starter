@@ -575,30 +575,40 @@ function loadSamplerAsync(name, variation) {
   }).connect(limiter)
 }
 
+// Build a 1-second silent WAV for the iOS audio session keepalive element.
+// 1 second at 8 kHz so loop=true doesn't spin faster than necessary.
+function buildSilentWav() {
+  const sr = 8000, n = sr, dataSize = n * 2
+  const buf = new ArrayBuffer(44 + dataSize)
+  const v = new DataView(buf)
+  const w = (off, s) => [...s].forEach((c, i) => v.setUint8(off + i, c.charCodeAt(0)))
+  w(0, 'RIFF'); v.setUint32(4, 36 + dataSize, true)
+  w(8, 'WAVE'); w(12, 'fmt ')
+  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true)
+  v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true)
+  v.setUint16(32, 2, true); v.setUint16(34, 16, true)
+  w(36, 'data'); v.setUint32(40, dataSize, true)
+  return new Uint8Array(buf) // zero-filled = silence
+}
+
 export async function startAudio() {
   dbgLog(`startAudio ctxState=${Tone.getContext().rawContext.state}`)
 
-  // iOS session switch fires synchronously (gesture token still live).
-  // _iosUnlockEl holds a module-level ref so the element isn't GC'd before
-  // play() resolves — GC causes "The operation was aborted" rejection.
+  // iOS: play a looping silent Audio element to hold the iOS audio session open
+  // for the lifetime of the page. Without this, iOS drops the audio session
+  // ~15s after startAudio() returns, putting the AudioContext into 'interrupted'
+  // and silencing all output. An active <audio> element prevents the session
+  // from being reclaimed. Must be called synchronously in the gesture stack.
   if (isIOS) {
     try {
-      const wav = new Uint8Array([
-        0x52,0x49,0x46,0x46, 0x26,0x00,0x00,0x00,
-        0x57,0x41,0x56,0x45,
-        0x66,0x6d,0x74,0x20, 0x10,0x00,0x00,0x00,
-        0x01,0x00, 0x01,0x00,
-        0x44,0xac,0x00,0x00, 0x88,0x58,0x01,0x00,
-        0x02,0x00, 0x10,0x00,
-        0x64,0x61,0x74,0x61, 0x02,0x00,0x00,0x00,
-        0x01,0x00,
-      ])
-      const url = URL.createObjectURL(new Blob([wav], { type: 'audio/wav' }))
+      const url = URL.createObjectURL(new Blob([buildSilentWav()], { type: 'audio/wav' }))
       _iosUnlockEl = new Audio(url)
+      _iosUnlockEl.loop = true
       _iosUnlockEl.volume = 0.001
       _iosUnlockEl.play()
-        .then(() => { URL.revokeObjectURL(url); _iosUnlockEl = null; dbgLog('iOS session play() resolved') })
-        .catch(e => { _iosUnlockEl = null; dbgLog(`iOS session ERR: ${e.message}`) })
+        .then(() => dbgLog('iOS session keepalive looping'))
+        .catch(e => dbgLog(`iOS session ERR: ${e.message}`))
+      // _iosUnlockEl intentionally NOT nulled — stays alive to hold audio session
     } catch (e) { dbgLog(`iOS session sync ERR: ${e.message}`) }
   }
 
@@ -631,7 +641,11 @@ export async function startAudio() {
     }
     ctx.addEventListener('statechange', () => {
       dbgLog(`ctx statechange -> ${ctx.state}`)
-      if (ctx.state !== 'running') ctx.resume().catch(() => {})
+      if (ctx.state !== 'running') {
+        // Re-trigger the keepalive element if it paused (e.g., page hidden/resumed)
+        if (_iosUnlockEl?.paused) _iosUnlockEl.play().catch(() => {})
+        ctx.resume().catch(() => {})
+      }
     })
   } catch (e) { dbgLog(`resume ERR: ${e.message}`) }
 }
