@@ -586,7 +586,9 @@ export async function startAudio() {
       ])
       const url = URL.createObjectURL(new Blob([wav], { type: 'audio/wav' }))
       const el = new Audio(url)
-      el.play().then(() => URL.revokeObjectURL(url)).catch(() => URL.revokeObjectURL(url))
+      el.play()
+        .then(() => { URL.revokeObjectURL(url); dbgLog('iOS session play() resolved') })
+        .catch(e => { URL.revokeObjectURL(url); dbgLog(`iOS session play() REJECTED: ${e.message}`) })
       dbgLog('iOS playback session requested')
     } catch (e) { dbgLog(`iOS session ERR: ${e.message}`) }
   }
@@ -613,6 +615,27 @@ export async function startAudio() {
       dbgLog(`resumed ctxState=${ctx.state}`)
     }
   } catch (e) { dbgLog(`resume ERR: ${e.message}`) }
+
+  // Raw oscillator test: bypasses Tone.js entirely to check if Web Audio
+  // output itself works. You should hear a 440 Hz beep for ~0.4 s.
+  try {
+    const rawCtx = Tone.getContext().rawContext
+    const osc = rawCtx.createOscillator()
+    const g = rawCtx.createGain()
+    g.gain.value = 0.4
+    osc.frequency.value = 440
+    osc.connect(g)
+    g.connect(rawCtx.destination)
+    osc.start(rawCtx.currentTime + 0.05)
+    osc.stop(rawCtx.currentTime + 0.45)
+    dbgLog('raw osc test fired (440 Hz beep — audible?)')
+  } catch (e) { dbgLog(`raw osc ERR: ${e.message}`) }
+
+  // Track any subsequent state changes
+  try {
+    const rawCtx = Tone.getContext().rawContext
+    rawCtx.addEventListener('statechange', () => dbgLog(`ctx statechange → ${rawCtx.state}`))
+  } catch (_) {}
 }
 
 export function setInstrument(name, variation = 0) {
