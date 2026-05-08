@@ -652,10 +652,7 @@ export async function startAudio() {
 
 export function setInstrument(name, variation = 0) {
   buildSynth(name, variation)
-  // Skip sampler on iOS to test if PolySynth alone produces sound.
-  // If PolySynth works, Sampler is the culprit; if not, signal chain is broken.
-  if (!isIOS) loadSamplerAsync(name, variation)
-  dbgLog(`setInstrument ${name}[${variation}] sampler=${!isIOS}`)
+  loadSamplerAsync(name, variation)
 }
 
 export function playNoteAt(note, duration, time) {

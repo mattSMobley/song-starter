@@ -60,6 +60,10 @@ export default function ChordDisplay({ activeNotes, compact = false }) {
         padding: '14px 22px',
         borderRadius: 16,
         minWidth: 110,
+        minHeight: 60,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
         textAlign: 'center',
         background: chord
           ? 'linear-gradient(135deg, rgba(124,58,237,0.28) 0%, rgba(6,182,212,0.1) 100%)'

@@ -256,7 +256,7 @@ export default function SessionTab({ root, scale, bpm }) {
           onClick={toggleSession}
           className="flex items-center gap-2 rounded-xl font-bold transition-all"
           style={{
-            padding: '11px 26px', fontSize: '0.8rem', letterSpacing: '0.06em', textTransform: 'uppercase',
+            padding: '8px 16px', fontSize: '0.75rem', letterSpacing: '0.06em', textTransform: 'uppercase',
             background: isPlaying
               ? 'linear-gradient(135deg, rgba(6,182,212,0.4), rgba(6,182,212,0.2))'
               : 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
@@ -273,7 +273,8 @@ export default function SessionTab({ root, scale, bpm }) {
       </div>
 
       {/* ── Scrollable body ── */}
-      <div className="flex-1 overflow-y-auto min-h-0 flex flex-col gap-4 pb-4">
+      <div className="flex-1 overflow-y-auto min-h-0 flex flex-col gap-4 pb-4"
+        style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}>
 
         {/* ── Beat ── */}
         <div style={card(true)}>
@@ -286,7 +287,7 @@ export default function SessionTab({ root, scale, bpm }) {
           </div>
 
           {/* Drum selector pills */}
-          <div className="flex gap-2 overflow-x-auto pb-2" style={{ scrollbarWidth: 'thin' }}>
+          <div className="flex gap-2 overflow-x-auto pb-2" style={{ scrollbarWidth: 'thin', touchAction: 'pan-x' }}>
             {DRUM_LOOPS.map((d, i) => (
               <button key={d.id} onClick={() => setDrumIdx(i)} style={pill(drumIdx === i, 'purple')}>
                 {d.name}
@@ -343,7 +344,7 @@ export default function SessionTab({ root, scale, bpm }) {
           </div>
 
           {/* Progression pills */}
-          <div className="flex gap-2 overflow-x-auto pb-2" style={{ scrollbarWidth: 'thin' }}>
+          <div className="flex gap-2 overflow-x-auto pb-2" style={{ scrollbarWidth: 'thin', touchAction: 'pan-x' }}>
             {progressions.map((p, i) => (
               <button key={i} onClick={() => setProgIdx(i)} style={pill(progIdx === i, 'cyan')}>
                 {p.name}

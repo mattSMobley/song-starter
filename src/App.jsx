@@ -11,7 +11,7 @@ import ChordDisplay from './components/ChordDisplay.jsx'
 import ChordProgressionPanel from './components/ChordProgressionPanel.jsx'
 import SessionTab from './components/SessionTab.jsx'
 import BassPedals from './components/BassPedals.jsx'
-import { startAudio, setInstrument, playNote, onSamplerLoading, setTempo, INSTRUMENTS, getDbgLog } from './audio/engine.js'
+import { startAudio, setInstrument, playNote, onSamplerLoading, setTempo, INSTRUMENTS } from './audio/engine.js'
 import { initMidi, getMidiOutputs, selectOutput, setMidiChannel, getMidiChannel, isMidiActive, getSelectedOutputId, onOutputsChange } from './audio/midiOut.js'
 import { ROOTS, SCALE_NAMES, getScaleNotes } from './audio/scales.js'
 import { generateVariations } from './audio/melodyGen.js'
@@ -41,9 +41,6 @@ export default function App() {
   const [midiReady, setMidiReady] = useState(false)
   const [activeNotes, setActiveNotes] = useState(new Set())
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
-  const [dbgVisible, setDbgVisible] = useState(false)
-  const [dbgLines, setDbgLines] = useState([])
-  const dbgInterval = useRef(null)
 
   const handlePianoNoteOn = useCallback((note) => {
     recorderRef.current?.noteOn(note)
@@ -61,18 +58,6 @@ export default function App() {
   const playAllRef = useRef(false)
   const playAllPartRef = useRef(null)
   const recorderRef = useRef(null)
-
-  function toggleDbg() {
-    setDbgVisible(v => {
-      if (!v) {
-        setDbgLines(getDbgLog())
-        dbgInterval.current = setInterval(() => setDbgLines(getDbgLog()), 500)
-      } else {
-        clearInterval(dbgInterval.current)
-      }
-      return !v
-    })
-  }
 
   const handleOctaveUp = useCallback(() => {
     setOctave(o => {
@@ -877,11 +862,12 @@ export default function App() {
           </div>
 
           {/* Tab area */}
-          <div className="flex-1 flex flex-col overflow-hidden gap-3" style={{ padding: '12px 32px' }}>
+          <div className="flex-1 flex flex-col overflow-hidden gap-3" style={{ padding: isMobile ? '12px 16px' : '12px 32px' }}>
 
             {/* Tab bar + contextual actions */}
-            <div className="flex items-center gap-3 flex-shrink-0">
-              <div style={{ overflowX: 'auto', flexShrink: 0 }}>
+            <div className={`flex-shrink-0 ${isMobile ? 'flex flex-col gap-2' : 'flex items-center gap-3'}`}>
+              {/* Tab bar — scrollable on mobile so all 6 tabs are reachable */}
+              <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', ...(isMobile ? {} : { flexShrink: 0 }) }}>
                 <div className="flex items-center gap-1"
                   style={{
                     background: 'rgba(10,5,22,0.85)',
@@ -898,7 +884,7 @@ export default function App() {
                       <button key={tab} onClick={() => setActiveTab(tab)}
                         className="rounded-xl font-semibold transition-all"
                         style={{
-                          padding: '6px 18px',
+                          padding: isMobile ? '6px 12px' : '6px 18px',
                           fontSize: '0.78rem',
                           background: on
                             ? 'linear-gradient(135deg, rgba(124,58,237,0.58), rgba(109,40,217,0.38))'
@@ -908,6 +894,7 @@ export default function App() {
                           boxShadow: on ? '0 0 22px rgba(124,58,237,0.4), inset 0 1px 0 rgba(255,255,255,0.1)' : 'none',
                           letterSpacing: '0.04em',
                           textShadow: on ? '0 0 12px rgba(168,85,247,0.8)' : 'none',
+                          whiteSpace: 'nowrap',
                         }}>
                         {tab}
                       </button>
@@ -917,8 +904,8 @@ export default function App() {
               </div>
 
               {activeTab === 'Generate' && (
-                <>
-                  <div className="flex-1" />
+                <div className="flex items-center gap-2 flex-shrink-0"
+                  style={isMobile ? {} : { marginLeft: 'auto' }}>
                   <span style={{ fontSize: '0.68rem', color: 'rgba(148,163,184,0.4)', letterSpacing: '0.04em', flexShrink: 0 }}>
                     <span style={{ color: '#c084fc' }}>{root}</span>{' '}
                     <span style={{ color: '#22d3ee' }}>{scale}</span>
@@ -975,7 +962,7 @@ export default function App() {
                       {playAllIdx >= 0 ? `${playAllIdx + 1} / ${melodies.length}` : 'Play All'}
                     </button>
                   )}
-                </>
+                </div>
               )}
             </div>
 
@@ -1104,33 +1091,6 @@ export default function App() {
           </div>
         </main>
       </div>
-
-      <button
-        onClick={toggleDbg}
-        style={{
-          position: 'fixed', bottom: 12, right: 12, zIndex: 9999,
-          padding: '6px 10px', borderRadius: 8, fontSize: '0.65rem', fontWeight: 700,
-          background: dbgVisible ? 'rgba(239,68,68,0.9)' : 'rgba(30,20,50,0.85)',
-          border: '1px solid rgba(168,85,247,0.4)', color: dbgVisible ? '#fff' : '#c084fc',
-          backdropFilter: 'blur(8px)', cursor: 'pointer',
-        }}>
-        {dbgVisible ? 'HIDE' : 'DBG'}
-      </button>
-
-      {dbgVisible && (
-        <div style={{
-          position: 'fixed', bottom: 48, left: 8, right: 8, zIndex: 9998,
-          maxHeight: '45vh', overflowY: 'auto',
-          background: 'rgba(4,2,10,0.96)', border: '1px solid rgba(168,85,247,0.35)',
-          borderRadius: 10, padding: '10px 12px', backdropFilter: 'blur(12px)',
-          fontFamily: 'monospace', fontSize: '0.6rem', color: '#a3e635', lineHeight: 1.6,
-        }}>
-          {dbgLines.length === 0
-            ? <span style={{ color: 'rgba(148,163,184,0.5)' }}>no logs yet</span>
-            : dbgLines.map((l, i) => <div key={i}>{l}</div>)
-          }
-        </div>
-      )}
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
