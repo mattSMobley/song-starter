@@ -128,11 +128,8 @@ export default function App() {
     setMidiChannel(ch)
   }
 
-  function handleStart() {
-    // startAudio() initializes the graph synchronously before its first await,
-    // so limiter/synth are ready by the time setInstrument runs below.
-    // We don't await it so a slow/stuck AudioContext resume can't block the UI.
-    startAudio()
+  async function handleStart() {
+    await startAudio()
     setTempo(bpm)
     setInstrument(instrument, variation)
     onSamplerLoading(setSamplerLoading)

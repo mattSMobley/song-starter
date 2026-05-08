@@ -1,6 +1,10 @@
 import * as Tone from 'tone'
 import { sendNoteOn, sendNoteOff } from './midiOut.js'
 
+// Module-level ref keeps the iOS unlock Audio element from being GC'd
+// before play() resolves — GC causes "The operation was aborted" error.
+let _iosUnlockEl = null
+
 // ── Debug log ─────────────────────────────────────────────────────────────────
 const _log = []
 export function dbgLog(msg) {
@@ -554,6 +558,9 @@ function loadSamplerAsync(name, variation) {
       if (pendingLoad === loadId && currentInstrument === name && currentVariation === variation) {
         if (activeSynth) activeSynth.dispose()
         activeSynth = sampler
+        dbgLog(`sampler swapped in: ${key}`)
+      } else {
+        dbgLog(`sampler loaded stale: ${key}`)
       }
       if (samplerLoadCallback) samplerLoadCallback(false)
     },
@@ -561,15 +568,11 @@ function loadSamplerAsync(name, variation) {
 }
 
 export async function startAudio() {
-  // Sync section — runs before first await so caller can fire-and-forget safely.
-  // Audio graph and synth are ready before any async work begins.
-  initAudioGraph()
-  if (!activeSynth) buildSynth('keys', 0)
-
   dbgLog(`startAudio ctxState=${Tone.getContext().rawContext.state}`)
 
-  // iOS: session switch (ambient->playback) must fire synchronously while
-  // the gesture token is still live — before any await.
+  // iOS session switch fires synchronously (gesture token still live).
+  // _iosUnlockEl holds a module-level ref so the element isn't GC'd before
+  // play() resolves — GC causes "The operation was aborted" rejection.
   if (isIOS) {
     try {
       const wav = new Uint8Array([
@@ -583,19 +586,24 @@ export async function startAudio() {
         0x01,0x00,
       ])
       const url = URL.createObjectURL(new Blob([wav], { type: 'audio/wav' }))
-      const el = new Audio(url)
-      el.volume = 0.001
-      el.play()
-        .then(() => { URL.revokeObjectURL(url); dbgLog('iOS session play() resolved') })
-        .catch(e => dbgLog(`iOS session ERR: ${e.message}`))
+      _iosUnlockEl = new Audio(url)
+      _iosUnlockEl.volume = 0.001
+      _iosUnlockEl.play()
+        .then(() => { URL.revokeObjectURL(url); _iosUnlockEl = null; dbgLog('iOS session play() resolved') })
+        .catch(e => { _iosUnlockEl = null; dbgLog(`iOS session ERR: ${e.message}`) })
     } catch (e) { dbgLog(`iOS session sync ERR: ${e.message}`) }
   }
 
-  // Async section — 2s timeout prevents blocking the splash screen.
+  // Resume context — 3s timeout so a stuck AudioContext can't block splash.
   try {
-    await Promise.race([Tone.start(), new Promise(r => setTimeout(r, 2000))])
+    await Promise.race([Tone.start(), new Promise(r => setTimeout(r, 3000))])
   } catch (e) { dbgLog(`Tone.start ERR: ${e.message}`) }
   dbgLog(`Tone.start done ctxState=${Tone.getContext().rawContext.state}`)
+
+  // Build audio graph AFTER context is running so nodes are created on a
+  // live context (iOS can produce silent nodes if created while suspended).
+  initAudioGraph()
+  if (!activeSynth) buildSynth('keys', 0)
 
   try {
     const raw = Tone.getContext().rawContext
@@ -604,15 +612,15 @@ export async function startAudio() {
     src.buffer = buf
     src.connect(raw.destination)
     src.start(0)
-  } catch (e) {}
+    dbgLog('silent buf played')
+  } catch (e) { dbgLog(`silent buf ERR: ${e.message}`) }
 
   try {
     const ctx = Tone.getContext().rawContext
     if (ctx.state !== 'running') {
       await ctx.resume()
-      dbgLog(`ctx.resume() done ctxState=${ctx.state}`)
+      dbgLog(`ctx.resume() done state=${ctx.state}`)
     }
-    // Auto-recover if iOS suspends/interrupts the context mid-session
     ctx.addEventListener('statechange', () => {
       dbgLog(`ctx statechange -> ${ctx.state}`)
       if (ctx.state !== 'running') ctx.resume().catch(() => {})
@@ -643,7 +651,8 @@ export function playNote(note, duration = '8n') {
 export function noteOn(note) {
   if (!activeSynth) buildSynth(currentInstrument, currentVariation)
   const ctxState = Tone.getContext().rawContext.state
-  dbgLog(`noteOn ${note} ctx=${ctxState}`)
+  const synthType = activeSynth?.constructor?.name ?? 'none'
+  dbgLog(`noteOn ${note} ctx=${ctxState} synth=${synthType}`)
   try { activeSynth.triggerAttack(note) } catch (e) { dbgLog(`noteOn ERR: ${e.message}`) }
   sendNoteOn(note)
 }
