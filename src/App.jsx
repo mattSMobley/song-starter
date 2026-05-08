@@ -741,39 +741,41 @@ export default function App() {
 
             {isMobile ? (
               /* ── Mobile piano zone ── */
-              <div className="flex flex-col gap-2 items-center">
-                {/* Compact piano + chord display side by side */}
-                <div className="flex items-center justify-center gap-3">
-                  <ChordDisplay activeNotes={activeNotes} />
+              <div className="flex flex-col gap-2 w-full">
+                {/* Row 1: compact chord badge + variation pills */}
+                <div className="flex items-center gap-2 w-full">
+                  <ChordDisplay compact activeNotes={activeNotes} />
+                  <div className="flex gap-1.5 overflow-x-auto flex-1" style={{ paddingBottom: 2 }}>
+                    {(() => {
+                      const inst = INSTRUMENTS.find(i => i.id === instrument)
+                      return inst?.variations.map((v, idx) => {
+                        const on = variation === idx
+                        return (
+                          <button key={idx} onClick={() => handleVariationChange(idx)}
+                            className="rounded-lg font-semibold flex-shrink-0 transition-all"
+                            style={{
+                              padding: '5px 10px', fontSize: '0.68rem',
+                              background: on ? 'linear-gradient(135deg, rgba(124,58,237,0.45), rgba(109,40,217,0.28))' : 'rgba(255,255,255,0.04)',
+                              border: on ? '1px solid rgba(168,85,247,0.55)' : '1px solid rgba(255,255,255,0.07)',
+                              color: on ? '#f0e0ff' : 'rgba(148,163,184,0.5)',
+                              boxShadow: on ? '0 0 10px rgba(124,58,237,0.3)' : 'none',
+                            }}>
+                            {v}
+                          </button>
+                        )
+                      })
+                    })()}
+                  </div>
+                </div>
+                {/* Row 2: 2-octave compact piano, scrollable */}
+                <div style={{ overflowX: 'auto', width: '100%' }}>
                   <Piano
-                    compact octaveStart={octave} numOctaves={1} keyboardMode={false}
+                    compact octaveStart={octave} numOctaves={2} keyboardMode={false}
                     highlightNotes={scaleHighlights}
                     chordNotes={chordHighlights}
                     onNoteOn={handlePianoNoteOn}
                     onNoteOff={handlePianoNoteOff}
                   />
-                </div>
-                {/* Variation pills — horizontal scroll */}
-                <div className="flex gap-2 overflow-x-auto w-full" style={{ paddingBottom: 2 }}>
-                  {(() => {
-                    const inst = INSTRUMENTS.find(i => i.id === instrument)
-                    return inst?.variations.map((v, idx) => {
-                      const on = variation === idx
-                      return (
-                        <button key={idx} onClick={() => handleVariationChange(idx)}
-                          className="rounded-lg font-semibold flex-shrink-0 transition-all"
-                          style={{
-                            padding: '6px 12px', fontSize: '0.7rem',
-                            background: on ? 'linear-gradient(135deg, rgba(124,58,237,0.45), rgba(109,40,217,0.28))' : 'rgba(255,255,255,0.04)',
-                            border: on ? '1px solid rgba(168,85,247,0.55)' : '1px solid rgba(255,255,255,0.07)',
-                            color: on ? '#f0e0ff' : 'rgba(148,163,184,0.5)',
-                            boxShadow: on ? '0 0 10px rgba(124,58,237,0.3)' : 'none',
-                          }}>
-                          {v}
-                        </button>
-                      )
-                    })
-                  })()}
                 </div>
               </div>
             ) : (

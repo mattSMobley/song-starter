@@ -5,7 +5,7 @@ import { sendNoteOn, sendNoteOff } from './midiOut.js'
 export let analyser = null
 
 // ── Effects chain (lazy — created after user gesture to unblock iOS) ─────────
-let reverb, delay, chorus, limiter, masterOut
+let reverb, delay, limiter, masterOut
 let audioInitialized = false
 
 function initAudioGraph() {
@@ -26,9 +26,10 @@ function initAudioGraph() {
   delay.connect(masterOut)    // primary path — always works
   delay.connect(reverbSend)   // parallel reverb add-on
 
-  chorus  = new Tone.Chorus({ frequency: 2, delayTime: 3.5, depth: 0.4, wet: 0.3 }).connect(delay)
+  // Chorus removed: Tone.Chorus uses stereo ChannelSplitter/Merger nodes that
+  // silently fail on iOS Safari, blocking the entire signal chain.
   limiter = new Tone.Limiter(-3)
-  limiter.fan(chorus, analyser)
+  limiter.fan(delay, analyser)
   initDrums()
 }
 

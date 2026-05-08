@@ -1,8 +1,51 @@
 import { detectChord } from '../audio/chordDetect.js'
 
-export default function ChordDisplay({ activeNotes }) {
+export default function ChordDisplay({ activeNotes, compact = false }) {
   const chord = detectChord([...activeNotes])
   const hasNotes = activeNotes.size > 0
+
+  if (compact) {
+    return (
+      <div style={{
+        padding: '6px 10px',
+        borderRadius: 10,
+        flexShrink: 0,
+        minWidth: 64,
+        textAlign: 'center',
+        background: chord
+          ? 'linear-gradient(135deg, rgba(124,58,237,0.28) 0%, rgba(6,182,212,0.1) 100%)'
+          : 'rgba(255,255,255,0.015)',
+        border: chord ? '1px solid rgba(124,58,237,0.5)' : '1px solid rgba(255,255,255,0.06)',
+        boxShadow: chord ? '0 0 14px rgba(124,58,237,0.25)' : 'none',
+        transition: 'all 0.12s ease',
+      }}>
+        {chord ? (
+          <div className="flex items-baseline justify-center" style={{ gap: 1 }}>
+            <span style={{
+              fontSize: '1.15rem', fontWeight: 900, letterSpacing: '-0.02em',
+              color: '#f0e6ff', fontFamily: 'monospace',
+              textShadow: '0 0 14px rgba(168,85,247,0.75)', lineHeight: 1,
+            }}>
+              {chord.root}
+            </span>
+            {chord.suffix && (
+              <span style={{
+                fontSize: '0.65rem', fontWeight: 700, color: '#a78bfa',
+                alignSelf: 'flex-end', paddingBottom: 2,
+              }}>
+                {chord.suffix}
+              </span>
+            )}
+          </div>
+        ) : (
+          <span style={{
+            color: hasNotes ? 'rgba(168,85,247,0.35)' : 'rgba(71,85,105,0.3)',
+            fontSize: '0.85rem', fontFamily: 'monospace',
+          }}>—</span>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col items-center justify-center gap-2.5" style={{ width: 160 }}>
