@@ -1,6 +1,16 @@
 import * as Tone from 'tone'
 import { sendNoteOn, sendNoteOff } from './midiOut.js'
 
+// ── Debug log (on-screen overlay for iOS diagnosis) ──────────────────────────
+const _log = []
+export function dbgLog(msg) {
+  const ts = new Date().toISOString().slice(11, 23)
+  _log.push(`${ts} ${msg}`)
+  if (_log.length > 30) _log.shift()
+  console.log('[AudioDbg]', msg)
+}
+export function getDbgLog() { return [..._log] }
+
 // ── Shared analyser (exported for Visualizer) ────────────────────────────────
 export let analyser = null
 
@@ -18,6 +28,7 @@ let audioInitialized = false
 function initAudioGraph() {
   if (audioInitialized) return
   audioInitialized = true
+  dbgLog(`initAudioGraph isIOS=${isIOS}`)
   analyser  = new Tone.Analyser('waveform', 256)
   masterOut = new Tone.Gain(1).toDestination()
 
@@ -513,6 +524,7 @@ function buildSynth(name, variation = 0) {
   activeSynth.connect(limiter)
   currentInstrument = name
   currentVariation = idx
+  dbgLog(`buildSynth ${name}[${idx}] type=${activeSynth.constructor.name}`)
   return activeSynth
 }
 
@@ -544,8 +556,9 @@ function loadSamplerAsync(name, variation) {
       if (pendingLoad === loadId && currentInstrument === name && currentVariation === variation) {
         if (activeSynth) activeSynth.dispose()
         activeSynth = sampler
+        dbgLog(`sampler loaded+active ${key}`)
       } else {
-        // Loaded but no longer needed — keep in cache, don't swap
+        dbgLog(`sampler loaded (stale) ${key}`)
       }
       if (samplerLoadCallback) samplerLoadCallback(false)
     },
@@ -553,7 +566,9 @@ function loadSamplerAsync(name, variation) {
 }
 
 export async function startAudio() {
+  dbgLog(`startAudio ctxState=${Tone.getContext().rawContext.state}`)
   await Tone.start()
+  dbgLog(`Tone.start() done ctxState=${Tone.getContext().rawContext.state}`)
   // iOS belt-and-suspenders: play a near-silent buffer to fully unlock
   // the audio session (required on some iOS versions even after resume)
   try {
@@ -563,16 +578,18 @@ export async function startAudio() {
     src.buffer = buf
     src.connect(raw.destination)
     src.start(0)
-  } catch (_) {}
+    dbgLog('silent buf played')
+  } catch (e) { dbgLog(`silent buf ERR: ${e.message}`) }
   initAudioGraph()
   if (!activeSynth) buildSynth('keys', 0)
-  // Re-verify context state after graph construction — on non-iOS builds
-  // the Reverb OfflineAudioContext renders asynchronously but can still
-  // interfere; an extra resume() call costs nothing if already running.
   try {
     const ctx = Tone.getContext().rawContext
-    if (ctx.state !== 'running') await ctx.resume()
-  } catch (_) {}
+    dbgLog(`post-init ctxState=${ctx.state}`)
+    if (ctx.state !== 'running') {
+      await ctx.resume()
+      dbgLog(`resumed ctxState=${ctx.state}`)
+    }
+  } catch (e) { dbgLog(`resume ERR: ${e.message}`) }
 }
 
 export function setInstrument(name, variation = 0) {
@@ -597,7 +614,9 @@ export function playNote(note, duration = '8n') {
 
 export function noteOn(note) {
   if (!activeSynth) buildSynth(currentInstrument, currentVariation)
-  try { activeSynth.triggerAttack(note) } catch (e) {}
+  const ctx = Tone.getContext().rawContext
+  dbgLog(`noteOn ${note} ctx=${ctx.state} synth=${activeSynth?.constructor?.name}`)
+  try { activeSynth.triggerAttack(note) } catch (e) { dbgLog(`noteOn ERR: ${e.message}`) }
   sendNoteOn(note)
 }
 
