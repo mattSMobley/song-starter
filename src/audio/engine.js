@@ -5,15 +5,27 @@ import { sendNoteOn, sendNoteOff } from './midiOut.js'
 export let analyser = null
 
 // ── Effects chain (lazy — created after user gesture to unblock iOS) ─────────
-let reverb, delay, chorus, limiter
+let reverb, delay, chorus, limiter, masterOut
 let audioInitialized = false
 
 function initAudioGraph() {
   if (audioInitialized) return
   audioInitialized = true
-  analyser = new Tone.Analyser('waveform', 256)
-  reverb  = new Tone.Reverb({ decay: 2.5, wet: 0.25 }).toDestination()
-  delay   = new Tone.FeedbackDelay({ delayTime: '8n', feedback: 0.25, wet: 0.15 }).connect(reverb)
+  analyser  = new Tone.Analyser('waveform', 256)
+  masterOut = new Tone.Gain(1).toDestination()
+
+  // Reverb as parallel send: if Tone.Reverb's OfflineAudioContext fails on iOS
+  // (leaving a null ConvolverNode buffer → total silence), the direct
+  // delay→masterOut path still passes audio unaffected.
+  reverb = new Tone.Reverb({ decay: 2.5, wet: 1.0 })
+  reverb.connect(masterOut)
+  const reverbSend = new Tone.Gain(0.28)
+  reverbSend.connect(reverb)
+
+  delay  = new Tone.FeedbackDelay({ delayTime: '8n', feedback: 0.25, wet: 0.15 })
+  delay.connect(masterOut)    // primary path — always works
+  delay.connect(reverbSend)   // parallel reverb add-on
+
   chorus  = new Tone.Chorus({ frequency: 2, delayTime: 3.5, depth: 0.4, wet: 0.3 }).connect(delay)
   limiter = new Tone.Limiter(-3)
   limiter.fan(chorus, analyser)
@@ -298,32 +310,42 @@ const INSTRUMENT_PRESETS = {
 let drumKick, drumSnare, drumHihatC, drumHihatO, drumCrash
 
 function initDrums() {
-  const drumReverb = new Tone.Reverb({ decay: 1.2, wet: 0.12 }).toDestination()
-  drumKick = new Tone.MembraneSynth({
+  const drumReverb = new Tone.Reverb({ decay: 1.2, wet: 1.0 })
+  drumReverb.connect(masterOut)
+  const drumReverbSend = new Tone.Gain(0.12)
+  drumReverbSend.connect(drumReverb)
+
+  const connectDrum = (synth) => {
+    synth.connect(masterOut)         // direct — works even if drumReverb fails
+    synth.connect(drumReverbSend)    // parallel reverb send
+    return synth
+  }
+
+  drumKick = connectDrum(new Tone.MembraneSynth({
     pitchDecay: 0.05, octaves: 7,
     envelope: { attack: 0.001, decay: 0.35, sustain: 0, release: 0.1 },
     volume: -2,
-  }).connect(drumReverb)
-  drumSnare = new Tone.NoiseSynth({
+  }))
+  drumSnare = connectDrum(new Tone.NoiseSynth({
     noise: { type: 'white' },
     envelope: { attack: 0.001, decay: 0.16, sustain: 0, release: 0.05 },
     volume: -6,
-  }).connect(drumReverb)
-  drumHihatC = new Tone.MetalSynth({
+  }))
+  drumHihatC = connectDrum(new Tone.MetalSynth({
     frequency: 400, harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5,
     envelope: { attack: 0.001, decay: 0.07, release: 0.01 },
     volume: -14,
-  }).connect(drumReverb)
-  drumHihatO = new Tone.MetalSynth({
+  }))
+  drumHihatO = connectDrum(new Tone.MetalSynth({
     frequency: 400, harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5,
     envelope: { attack: 0.001, decay: 0.28, release: 0.08 },
     volume: -16,
-  }).connect(drumReverb)
-  drumCrash = new Tone.MetalSynth({
+  }))
+  drumCrash = connectDrum(new Tone.MetalSynth({
     frequency: 300, harmonicity: 5.1, modulationIndex: 64, resonance: 4000, octaves: 3,
     envelope: { attack: 0.001, decay: 1.2, release: 0.4 },
     volume: -16,
-  }).connect(drumReverb)
+  }))
 }
 
 export function playDrumHit(type, time) {
