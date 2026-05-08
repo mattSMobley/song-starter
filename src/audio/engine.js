@@ -567,13 +567,10 @@ function loadSamplerAsync(name, variation) {
 
 export async function startAudio() {
   dbgLog(`startAudio ctxState=${Tone.getContext().rawContext.state}`)
-  await Tone.start()
-  dbgLog(`Tone.start() done ctxState=${Tone.getContext().rawContext.state}`)
 
-  // iOS: switch audio session from "ambient" (muted by silent switch) to
-  // "playback" AFTER Tone.start() so the context is running, not interrupted.
-  // Calling play() during the interrupted state caused the promise to hang.
-  // The gesture activation propagates through the await chain on modern iOS.
+  // iOS: initiate session switch BEFORE any await so we're still in the
+  // synchronous user-gesture context. Tone.start() is also initiated here
+  // (not awaited yet) so both fire while iOS still trusts the gesture token.
   if (isIOS) {
     try {
       const wav = new Uint8Array([
@@ -584,16 +581,23 @@ export async function startAudio() {
         0x44,0xac,0x00,0x00, 0x88,0x58,0x01,0x00,
         0x02,0x00, 0x10,0x00,
         0x64,0x61,0x74,0x61, 0x02,0x00,0x00,0x00,
-        0x01,0x00, // 1 non-zero sample so iOS doesn't skip playback
+        0x01,0x00,
       ])
       const url = URL.createObjectURL(new Blob([wav], { type: 'audio/wav' }))
       const el = new Audio(url)
       el.volume = 0.001
-      await el.play()
-      URL.revokeObjectURL(url)
-      dbgLog('iOS session play() resolved')
-    } catch (e) { dbgLog(`iOS session ERR: ${e.message}`) }
+      el.play()
+        .then(() => { URL.revokeObjectURL(url); dbgLog('iOS session play() resolved') })
+        .catch(e => dbgLog(`iOS session ERR: ${e.message}`))
+    } catch (e) { dbgLog(`iOS session ERR sync: ${e.message}`) }
   }
+
+  // Await Tone.start() with a hard 2s timeout so a stuck AudioContext
+  // can never permanently block the splash screen transition.
+  try {
+    await Promise.race([Tone.start(), new Promise(r => setTimeout(r, 2000))])
+  } catch (e) { dbgLog(`Tone.start ERR: ${e.message}`) }
+  dbgLog(`Tone.start() done ctxState=${Tone.getContext().rawContext.state}`)
   try {
     const raw = Tone.getContext().rawContext
     const buf = raw.createBuffer(1, 1, raw.sampleRate)
