@@ -1,6 +1,16 @@
 import * as Tone from 'tone'
 import { sendNoteOn, sendNoteOff } from './midiOut.js'
 
+// ── Debug log ─────────────────────────────────────────────────────────────────
+const _log = []
+export function dbgLog(msg) {
+  const ts = new Date().toISOString().slice(11, 23)
+  _log.push(`${ts} ${msg}`)
+  if (_log.length > 40) _log.shift()
+  console.log('[AudioDbg]', msg)
+}
+export function getDbgLog() { return [..._log] }
+
 // ── Shared analyser (exported for Visualizer) ────────────────────────────────
 export let analyser = null
 
@@ -551,8 +561,15 @@ function loadSamplerAsync(name, variation) {
 }
 
 export async function startAudio() {
-  // iOS: initiate session switch (ambient -> playback) BEFORE any await so
-  // we're still in the synchronous user-gesture context.
+  // Sync section — runs before first await so caller can fire-and-forget safely.
+  // Audio graph and synth are ready before any async work begins.
+  initAudioGraph()
+  if (!activeSynth) buildSynth('keys', 0)
+
+  dbgLog(`startAudio ctxState=${Tone.getContext().rawContext.state}`)
+
+  // iOS: session switch (ambient->playback) must fire synchronously while
+  // the gesture token is still live — before any await.
   if (isIOS) {
     try {
       const wav = new Uint8Array([
@@ -568,14 +585,17 @@ export async function startAudio() {
       const url = URL.createObjectURL(new Blob([wav], { type: 'audio/wav' }))
       const el = new Audio(url)
       el.volume = 0.001
-      el.play().then(() => URL.revokeObjectURL(url)).catch(() => {})
-    } catch (e) {}
+      el.play()
+        .then(() => { URL.revokeObjectURL(url); dbgLog('iOS session play() resolved') })
+        .catch(e => dbgLog(`iOS session ERR: ${e.message}`))
+    } catch (e) { dbgLog(`iOS session sync ERR: ${e.message}`) }
   }
 
-  // 2s timeout so a stuck AudioContext never permanently blocks the UI.
+  // Async section — 2s timeout prevents blocking the splash screen.
   try {
     await Promise.race([Tone.start(), new Promise(r => setTimeout(r, 2000))])
-  } catch (e) {}
+  } catch (e) { dbgLog(`Tone.start ERR: ${e.message}`) }
+  dbgLog(`Tone.start done ctxState=${Tone.getContext().rawContext.state}`)
 
   try {
     const raw = Tone.getContext().rawContext
@@ -586,13 +606,18 @@ export async function startAudio() {
     src.start(0)
   } catch (e) {}
 
-  initAudioGraph()
-  if (!activeSynth) buildSynth('keys', 0)
-
   try {
     const ctx = Tone.getContext().rawContext
-    if (ctx.state !== 'running') await ctx.resume()
-  } catch (e) {}
+    if (ctx.state !== 'running') {
+      await ctx.resume()
+      dbgLog(`ctx.resume() done ctxState=${ctx.state}`)
+    }
+    // Auto-recover if iOS suspends/interrupts the context mid-session
+    ctx.addEventListener('statechange', () => {
+      dbgLog(`ctx statechange -> ${ctx.state}`)
+      if (ctx.state !== 'running') ctx.resume().catch(() => {})
+    })
+  } catch (e) { dbgLog(`resume ERR: ${e.message}`) }
 }
 
 export function setInstrument(name, variation = 0) {
@@ -617,7 +642,9 @@ export function playNote(note, duration = '8n') {
 
 export function noteOn(note) {
   if (!activeSynth) buildSynth(currentInstrument, currentVariation)
-  try { activeSynth.triggerAttack(note) } catch (e) {}
+  const ctxState = Tone.getContext().rawContext.state
+  dbgLog(`noteOn ${note} ctx=${ctxState}`)
+  try { activeSynth.triggerAttack(note) } catch (e) { dbgLog(`noteOn ERR: ${e.message}`) }
   sendNoteOn(note)
 }
 

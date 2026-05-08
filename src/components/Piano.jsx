@@ -56,11 +56,12 @@ export default function Piano({
   const heldKeys = useRef(new Map()) // key → note
   const touchNoteRef = useRef(null)
 
-  const activate = useCallback((note) => {
+  const activate = useCallback(async (note) => {
     setActiveNotes(prev => new Set([...prev, note]))
-    // Fire resume request synchronously in gesture context (for iOS re-suspension),
-    // but play the note immediately rather than waiting in .then()
-    Tone.start()
+    // Await Tone.start() so the AudioContext is actually running before noteOn.
+    // If context is already running this resolves in a microtask (~0 ms).
+    // If interrupted (iOS), this properly waits for resume before playing.
+    await Tone.start()
     noteOn(note)
     onNoteOn?.(note)
   }, [onNoteOn])
