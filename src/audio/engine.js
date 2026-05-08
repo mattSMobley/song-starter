@@ -1,16 +1,6 @@
 import * as Tone from 'tone'
 import { sendNoteOn, sendNoteOff } from './midiOut.js'
 
-// ── Debug log (on-screen overlay for iOS diagnosis) ──────────────────────────
-const _log = []
-export function dbgLog(msg) {
-  const ts = new Date().toISOString().slice(11, 23)
-  _log.push(`${ts} ${msg}`)
-  if (_log.length > 30) _log.shift()
-  console.log('[AudioDbg]', msg)
-}
-export function getDbgLog() { return [..._log] }
-
 // ── Shared analyser (exported for Visualizer) ────────────────────────────────
 export let analyser = null
 
@@ -28,7 +18,6 @@ let audioInitialized = false
 function initAudioGraph() {
   if (audioInitialized) return
   audioInitialized = true
-  dbgLog(`initAudioGraph isIOS=${isIOS}`)
   analyser  = new Tone.Analyser('waveform', 256)
   masterOut = new Tone.Gain(1).toDestination()
 
@@ -524,7 +513,6 @@ function buildSynth(name, variation = 0) {
   activeSynth.connect(limiter)
   currentInstrument = name
   currentVariation = idx
-  dbgLog(`buildSynth ${name}[${idx}] type=${activeSynth.constructor.name}`)
   return activeSynth
 }
 
@@ -556,9 +544,6 @@ function loadSamplerAsync(name, variation) {
       if (pendingLoad === loadId && currentInstrument === name && currentVariation === variation) {
         if (activeSynth) activeSynth.dispose()
         activeSynth = sampler
-        dbgLog(`sampler loaded+active ${key}`)
-      } else {
-        dbgLog(`sampler loaded (stale) ${key}`)
       }
       if (samplerLoadCallback) samplerLoadCallback(false)
     },
@@ -566,11 +551,8 @@ function loadSamplerAsync(name, variation) {
 }
 
 export async function startAudio() {
-  dbgLog(`startAudio ctxState=${Tone.getContext().rawContext.state}`)
-
-  // iOS: initiate session switch BEFORE any await so we're still in the
-  // synchronous user-gesture context. Tone.start() is also initiated here
-  // (not awaited yet) so both fire while iOS still trusts the gesture token.
+  // iOS: initiate session switch (ambient -> playback) BEFORE any await so
+  // we're still in the synchronous user-gesture context.
   if (isIOS) {
     try {
       const wav = new Uint8Array([
@@ -586,18 +568,15 @@ export async function startAudio() {
       const url = URL.createObjectURL(new Blob([wav], { type: 'audio/wav' }))
       const el = new Audio(url)
       el.volume = 0.001
-      el.play()
-        .then(() => { URL.revokeObjectURL(url); dbgLog('iOS session play() resolved') })
-        .catch(e => dbgLog(`iOS session ERR: ${e.message}`))
-    } catch (e) { dbgLog(`iOS session ERR sync: ${e.message}`) }
+      el.play().then(() => URL.revokeObjectURL(url)).catch(() => {})
+    } catch (e) {}
   }
 
-  // Await Tone.start() with a hard 2s timeout so a stuck AudioContext
-  // can never permanently block the splash screen transition.
+  // 2s timeout so a stuck AudioContext never permanently blocks the UI.
   try {
     await Promise.race([Tone.start(), new Promise(r => setTimeout(r, 2000))])
-  } catch (e) { dbgLog(`Tone.start ERR: ${e.message}`) }
-  dbgLog(`Tone.start() done ctxState=${Tone.getContext().rawContext.state}`)
+  } catch (e) {}
+
   try {
     const raw = Tone.getContext().rawContext
     const buf = raw.createBuffer(1, 1, raw.sampleRate)
@@ -605,39 +584,15 @@ export async function startAudio() {
     src.buffer = buf
     src.connect(raw.destination)
     src.start(0)
-    dbgLog('silent buf played')
-  } catch (e) { dbgLog(`silent buf ERR: ${e.message}`) }
+  } catch (e) {}
+
   initAudioGraph()
   if (!activeSynth) buildSynth('keys', 0)
+
   try {
     const ctx = Tone.getContext().rawContext
-    dbgLog(`post-init ctxState=${ctx.state}`)
-    if (ctx.state !== 'running') {
-      await ctx.resume()
-      dbgLog(`resumed ctxState=${ctx.state}`)
-    }
-  } catch (e) { dbgLog(`resume ERR: ${e.message}`) }
-
-  // Raw oscillator test: bypasses Tone.js entirely to check if Web Audio
-  // output itself works. You should hear a 440 Hz beep for ~0.4 s.
-  try {
-    const rawCtx = Tone.getContext().rawContext
-    const osc = rawCtx.createOscillator()
-    const g = rawCtx.createGain()
-    g.gain.value = 0.4
-    osc.frequency.value = 440
-    osc.connect(g)
-    g.connect(rawCtx.destination)
-    osc.start(rawCtx.currentTime + 0.05)
-    osc.stop(rawCtx.currentTime + 0.45)
-    dbgLog('raw osc test fired (440 Hz beep - audible?)')
-  } catch (e) { dbgLog(`raw osc ERR: ${e.message}`) }
-
-  // Track any subsequent state changes
-  try {
-    const rawCtx = Tone.getContext().rawContext
-    rawCtx.addEventListener('statechange', () => dbgLog(`ctx statechange -> ${rawCtx.state}`))
-  } catch (_) {}
+    if (ctx.state !== 'running') await ctx.resume()
+  } catch (e) {}
 }
 
 export function setInstrument(name, variation = 0) {
@@ -662,9 +617,7 @@ export function playNote(note, duration = '8n') {
 
 export function noteOn(note) {
   if (!activeSynth) buildSynth(currentInstrument, currentVariation)
-  const ctx = Tone.getContext().rawContext
-  dbgLog(`noteOn ${note} ctx=${ctx.state} synth=${activeSynth?.constructor?.name}`)
-  try { activeSynth.triggerAttack(note) } catch (e) { dbgLog(`noteOn ERR: ${e.message}`) }
+  try { activeSynth.triggerAttack(note) } catch (e) {}
   sendNoteOn(note)
 }
 
