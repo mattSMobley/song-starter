@@ -520,6 +520,16 @@ function loadSamplerAsync(name, variation) {
 
 export async function startAudio() {
   await Tone.start()
+  // iOS belt-and-suspenders: play a near-silent buffer to fully unlock
+  // the audio session (required on some iOS versions even after resume)
+  try {
+    const raw = Tone.getContext().rawContext
+    const buf = raw.createBuffer(1, 1, raw.sampleRate)
+    const src = raw.createBufferSource()
+    src.buffer = buf
+    src.connect(raw.destination)
+    src.start(0)
+  } catch (_) {}
   initAudioGraph()
   if (!activeSynth) buildSynth('keys', 0)
 }
