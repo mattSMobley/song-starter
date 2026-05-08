@@ -4,6 +4,13 @@ import { sendNoteOn, sendNoteOff } from './midiOut.js'
 // ── Shared analyser (exported for Visualizer) ────────────────────────────────
 export let analyser = null
 
+// iOS detection — Tone.Reverb uses OfflineAudioContext to build its impulse
+// response; creating one right after AudioContext.resume() can silently
+// re-suspend the main context on iOS Safari, killing all audio output.
+// Skip reverb entirely on iOS and rely on the direct delay path.
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+  (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1)
+
 // ── Effects chain (lazy — created after user gesture to unblock iOS) ─────────
 let reverb, delay, limiter, masterOut
 let audioInitialized = false
@@ -14,20 +21,20 @@ function initAudioGraph() {
   analyser  = new Tone.Analyser('waveform', 256)
   masterOut = new Tone.Gain(1).toDestination()
 
-  // Reverb as parallel send: if Tone.Reverb's OfflineAudioContext fails on iOS
-  // (leaving a null ConvolverNode buffer → total silence), the direct
-  // delay→masterOut path still passes audio unaffected.
-  reverb = new Tone.Reverb({ decay: 2.5, wet: 1.0 })
-  reverb.connect(masterOut)
-  const reverbSend = new Tone.Gain(0.28)
-  reverbSend.connect(reverb)
+  delay = new Tone.FeedbackDelay({ delayTime: '8n', feedback: 0.25, wet: 0.15 })
+  delay.connect(masterOut)
 
-  delay  = new Tone.FeedbackDelay({ delayTime: '8n', feedback: 0.25, wet: 0.15 })
-  delay.connect(masterOut)    // primary path — always works
-  delay.connect(reverbSend)   // parallel reverb add-on
+  // Reverb skipped on iOS — its OfflineAudioContext can re-suspend the main
+  // AudioContext. On desktop: parallel send so a null convolver buffer
+  // (another iOS failure mode) cannot silence the direct delay→masterOut path.
+  if (!isIOS) {
+    reverb = new Tone.Reverb({ decay: 2.5, wet: 1.0 })
+    reverb.connect(masterOut)
+    const reverbSend = new Tone.Gain(0.28)
+    reverbSend.connect(reverb)
+    delay.connect(reverbSend)
+  }
 
-  // Chorus removed: Tone.Chorus uses stereo ChannelSplitter/Merger nodes that
-  // silently fail on iOS Safari, blocking the entire signal chain.
   limiter = new Tone.Limiter(-3)
   limiter.fan(delay, analyser)
   initDrums()
@@ -311,14 +318,18 @@ const INSTRUMENT_PRESETS = {
 let drumKick, drumSnare, drumHihatC, drumHihatO, drumCrash
 
 function initDrums() {
-  const drumReverb = new Tone.Reverb({ decay: 1.2, wet: 1.0 })
-  drumReverb.connect(masterOut)
-  const drumReverbSend = new Tone.Gain(0.12)
-  drumReverbSend.connect(drumReverb)
+  // Same iOS reasoning as main reverb — skip OfflineAudioContext on iOS
+  let drumReverbSend = null
+  if (!isIOS) {
+    const drumReverb = new Tone.Reverb({ decay: 1.2, wet: 1.0 })
+    drumReverb.connect(masterOut)
+    drumReverbSend = new Tone.Gain(0.12)
+    drumReverbSend.connect(drumReverb)
+  }
 
   const connectDrum = (synth) => {
-    synth.connect(masterOut)         // direct — works even if drumReverb fails
-    synth.connect(drumReverbSend)    // parallel reverb send
+    synth.connect(masterOut)
+    if (drumReverbSend) synth.connect(drumReverbSend)
     return synth
   }
 
@@ -555,6 +566,13 @@ export async function startAudio() {
   } catch (_) {}
   initAudioGraph()
   if (!activeSynth) buildSynth('keys', 0)
+  // Re-verify context state after graph construction — on non-iOS builds
+  // the Reverb OfflineAudioContext renders asynchronously but can still
+  // interfere; an extra resume() call costs nothing if already running.
+  try {
+    const ctx = Tone.getContext().rawContext
+    if (ctx.state !== 'running') await ctx.resume()
+  } catch (_) {}
 }
 
 export function setInstrument(name, variation = 0) {

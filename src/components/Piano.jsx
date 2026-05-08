@@ -58,7 +58,11 @@ export default function Piano({
 
   const activate = useCallback((note) => {
     setActiveNotes(prev => new Set([...prev, note]))
-    Tone.start().then(() => { noteOn(note); onNoteOn?.(note) })
+    // Fire resume request synchronously in gesture context (for iOS re-suspension),
+    // but play the note immediately rather than waiting in .then()
+    Tone.start()
+    noteOn(note)
+    onNoteOn?.(note)
   }, [onNoteOn])
 
   const deactivate = useCallback((note) => {
@@ -136,10 +140,11 @@ export default function Piano({
   const { whites, blacks } = buildKeys(octaveStart, numOctaves)
   const noteToKey = keyboardMode && !compact ? buildNoteToKey(octaveStart) : {}
 
-  const WHITE_W = compact ? 30 : 42
-  const WHITE_H = compact ? 110 : 140
-  const BLACK_W = compact ? 19 : 26
-  const BLACK_H = compact ? 68 : 88
+  // Compact: 14 white keys × 25 px = 350 px — fits a 393 px iPhone (minus 16 px padding each side)
+  const WHITE_W = compact ? 25 : 42
+  const WHITE_H = compact ? 90 : 140
+  const BLACK_W = compact ? 15 : 26
+  const BLACK_H = compact ? 55 : 88
   const totalW = whites.length * WHITE_W
 
   return (
