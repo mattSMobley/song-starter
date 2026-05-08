@@ -631,7 +631,7 @@ function loadSamplerAsync(name, variation) {
   // Track any subsequent state changes
   try {
     const rawCtx = Tone.getContext().rawContext
-    rawCtx.addEventListener('statechange', () => dbgLog(`ctx statechange → ${rawCtx.state}`))
+    rawCtx.addEventListener('statechange', () => dbgLog(`ctx statechange -> ${rawCtx.state}`))
   } catch (_) {}
 }
 
