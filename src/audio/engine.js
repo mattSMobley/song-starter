@@ -37,7 +37,7 @@ function initAudioGraph() {
 
   // Reverb skipped on iOS — its OfflineAudioContext can re-suspend the main
   // AudioContext. On desktop: parallel send so a null convolver buffer
-  // (another iOS failure mode) cannot silence the direct delay→masterOut path.
+  // (another iOS failure mode) cannot silence the direct delay->masterOut path.
   if (!isIOS) {
     reverb = new Tone.Reverb({ decay: 2.5, wet: 1.0 })
     reverb.connect(masterOut)
@@ -565,6 +565,7 @@ function loadSamplerAsync(name, variation) {
   }).connect(limiter)
 }
 
+export async function startAudio() {
   dbgLog(`startAudio ctxState=${Tone.getContext().rawContext.state}`)
   await Tone.start()
   dbgLog(`Tone.start() done ctxState=${Tone.getContext().rawContext.state}`)
@@ -625,7 +626,7 @@ function loadSamplerAsync(name, variation) {
     g.connect(rawCtx.destination)
     osc.start(rawCtx.currentTime + 0.05)
     osc.stop(rawCtx.currentTime + 0.45)
-    dbgLog('raw osc test fired (440 Hz beep — audible?)')
+    dbgLog('raw osc test fired (440 Hz beep - audible?)')
   } catch (e) { dbgLog(`raw osc ERR: ${e.message}`) }
 
   // Track any subsequent state changes
