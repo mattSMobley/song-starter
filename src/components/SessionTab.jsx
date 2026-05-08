@@ -240,7 +240,7 @@ export default function SessionTab({ root, scale, bpm }) {
   const prog     = progressions[Math.min(progIdx, progressions.length - 1)]
 
   return (
-    <div className="flex flex-col h-full gap-4 min-h-0">
+    <div className="flex flex-col h-full gap-4">
 
       {/* ── Header ── */}
       <div className="flex items-center justify-between flex-shrink-0">
@@ -267,14 +267,14 @@ export default function SessionTab({ root, scale, bpm }) {
           {isPlaying ? (
             <><svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>Stop</>
           ) : (
-            <><svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>Play Session</>
+            <><svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>Play</>
           )}
         </button>
       </div>
 
       {/* ── Scrollable body ── */}
-      <div className="flex-1 overflow-y-auto min-h-0 flex flex-col gap-4 pb-4"
-        style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}>
+      <div className="flex-1 overflow-y-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
+        <div className="flex flex-col gap-4 pb-4">
 
         {/* ── Beat ── */}
         <div style={card(true)}>
@@ -491,6 +491,7 @@ export default function SessionTab({ root, scale, bpm }) {
               </div>
             </div>
           )}
+        </div>
         </div>
       </div>
     </div>
