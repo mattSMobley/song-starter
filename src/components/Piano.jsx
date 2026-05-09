@@ -54,7 +54,7 @@ export default function Piano({
 }) {
   const [activeNotes, setActiveNotes] = useState(new Set())
   const heldKeys = useRef(new Map()) // key → note
-  const touchNoteRef = useRef(null)
+  const touchNotesRef = useRef(new Map()) // touch identifier → note
 
   const activate = useCallback(async (note) => {
     setActiveNotes(prev => new Set([...prev, note]))
@@ -116,25 +116,40 @@ export default function Piano({
 
   function handleTouchStart(e) {
     e.preventDefault()
-    const note = noteFromPoint(e.touches[0].clientX, e.touches[0].clientY)
-    if (note) { touchNoteRef.current = note; activate(note) }
+    for (const touch of e.changedTouches) {
+      const note = noteFromPoint(touch.clientX, touch.clientY)
+      if (note && !touchNotesRef.current.has(touch.identifier)) {
+        touchNotesRef.current.set(touch.identifier, note)
+        activate(note)
+      }
+    }
   }
 
   function handleTouchMove(e) {
     e.preventDefault()
-    const note = noteFromPoint(e.touches[0].clientX, e.touches[0].clientY)
-    if (note && note !== touchNoteRef.current) {
-      if (touchNoteRef.current) deactivate(touchNoteRef.current)
-      touchNoteRef.current = note
-      activate(note)
+    for (const touch of e.changedTouches) {
+      const note = noteFromPoint(touch.clientX, touch.clientY)
+      const prev = touchNotesRef.current.get(touch.identifier)
+      if (note !== prev) {
+        if (prev) deactivate(prev)
+        if (note) {
+          touchNotesRef.current.set(touch.identifier, note)
+          activate(note)
+        } else {
+          touchNotesRef.current.delete(touch.identifier)
+        }
+      }
     }
   }
 
   function handleTouchEnd(e) {
     e.preventDefault()
-    if (touchNoteRef.current) {
-      deactivate(touchNoteRef.current)
-      touchNoteRef.current = null
+    for (const touch of e.changedTouches) {
+      const note = touchNotesRef.current.get(touch.identifier)
+      if (note) {
+        deactivate(note)
+        touchNotesRef.current.delete(touch.identifier)
+      }
     }
   }
 
