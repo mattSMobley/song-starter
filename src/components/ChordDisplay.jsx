@@ -11,6 +11,11 @@ export default function ChordDisplay({ activeNotes, compact = false }) {
         borderRadius: 10,
         flexShrink: 0,
         minWidth: 64,
+        height: 34,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
         textAlign: 'center',
         background: chord
           ? 'linear-gradient(135deg, rgba(124,58,237,0.28) 0%, rgba(6,182,212,0.1) 100%)'
