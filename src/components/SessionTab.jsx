@@ -273,10 +273,8 @@ export default function SessionTab({ root, scale, bpm }) {
       </div>
 
       {/* ── Scrollable body ── */}
-      {/* position:relative + absolute inset-0 gives iOS a pixel-exact scroll height */}
-      <div className="flex-1 relative" style={{ minHeight: 0 }}>
-      <div className="absolute inset-0 overflow-y-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
-        <div className="flex flex-col gap-4 pb-4">
+      <div className="flex-1 overflow-y-auto min-h-0" style={{ WebkitOverflowScrolling: 'touch' }}>
+        <div className="flex flex-col gap-4" style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}>
 
         {/* ── Beat ── */}
         <div style={card(true)}>
@@ -495,7 +493,6 @@ export default function SessionTab({ root, scale, bpm }) {
           )}
         </div>
         </div>
-      </div>
       </div>
     </div>
   )
