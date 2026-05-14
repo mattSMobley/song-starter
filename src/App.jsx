@@ -54,7 +54,10 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [playAllIdx, setPlayAllIdx] = useState(-1)
   const [octaveMsg, setOctaveMsg] = useState('')
+  const [tapFlash, setTapFlash] = useState(false)
   const octaveMsgTimer = useRef(null)
+  const tapTimesRef = useRef([])
+  const tapFlashTimer = useRef(null)
   const playAllRef = useRef(false)
   const playAllPartRef = useRef(null)
   const recorderRef = useRef(null)
@@ -71,6 +74,26 @@ export default function App() {
       if (o <= 2) { clearTimeout(octaveMsgTimer.current); setOctaveMsg('Lowest octave'); octaveMsgTimer.current = setTimeout(() => setOctaveMsg(''), 1800); return o }
       return o - 1
     })
+  }, [])
+
+  const handleTapTempo = useCallback(() => {
+    const now = performance.now()
+    const taps = tapTimesRef.current
+    // Drop taps older than 3 seconds (user paused, starting fresh)
+    const recent = taps.filter(t => now - t < 3000)
+    recent.push(now)
+    tapTimesRef.current = recent
+    if (recent.length >= 2) {
+      const intervals = recent.slice(1).map((t, i) => t - recent[i])
+      const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length
+      const newBpm = Math.round(Math.min(200, Math.max(60, 60000 / avgInterval)))
+      setBpm(newBpm)
+      setTempo(newBpm)
+    }
+    // Flash feedback
+    clearTimeout(tapFlashTimer.current)
+    setTapFlash(true)
+    tapFlashTimer.current = setTimeout(() => setTapFlash(false), 120)
   }, [])
 
   useEffect(() => {
@@ -518,6 +541,22 @@ export default function App() {
             className="w-12 text-center font-mono font-bold bg-transparent outline-none"
             style={{ fontSize: '0.95rem', color: '#c084fc' }}
           />
+          <button
+            onPointerDown={handleTapTempo}
+            className="rounded-lg font-bold select-none transition-all"
+            style={{
+              fontSize: '0.6rem', letterSpacing: '0.12em', textTransform: 'uppercase',
+              padding: '4px 8px',
+              background: tapFlash
+                ? 'linear-gradient(135deg, rgba(168,85,247,0.55), rgba(124,58,237,0.45))'
+                : 'rgba(124,58,237,0.15)',
+              border: tapFlash ? '1px solid rgba(192,132,252,0.7)' : '1px solid rgba(124,58,237,0.3)',
+              color: tapFlash ? '#e9d5ff' : 'rgba(168,85,247,0.7)',
+              boxShadow: tapFlash ? '0 0 12px rgba(168,85,247,0.45)' : 'none',
+              cursor: 'pointer',
+            }}>
+            TAP
+          </button>
         </div>
       </header>
 
@@ -1066,6 +1105,7 @@ export default function App() {
                     }}>
                     <Recorder
                       ref={recorderRef}
+                      bpm={bpm}
                       onSaveRecording={(mel) => { handleSaveMelody(mel); setActiveTab('Inventory') }}
                     />
                   </div>

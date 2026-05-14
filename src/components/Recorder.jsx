@@ -1,14 +1,25 @@
-import { useState, useRef, useImperativeHandle, forwardRef } from 'react'
+import { useState, useRef, useImperativeHandle, forwardRef, useEffect } from 'react'
 import * as Tone from 'tone'
+import { exportMidi } from '../audio/midiExport.js'
 
-const Recorder = forwardRef(function Recorder({ onSaveRecording }, ref) {
+const Recorder = forwardRef(function Recorder({ onSaveRecording, bpm = 120 }, ref) {
   const [isRecording, setIsRecording] = useState(false)
   const [recorded, setRecorded] = useState(null)
+  const [audioBlob, setAudioBlob] = useState(null)
 
-  const isRecordingRef   = useRef(false)
-  const startTimeRef     = useRef(null)
-  const eventsRef        = useRef([])
-  const activeNotesRef   = useRef({})
+  const isRecordingRef    = useRef(false)
+  const startTimeRef      = useRef(null)
+  const eventsRef         = useRef([])
+  const activeNotesRef    = useRef({})
+  const toneRecorderRef   = useRef(null)
+
+  useEffect(() => () => {
+    if (toneRecorderRef.current) {
+      toneRecorderRef.current.stop().catch(() => {})
+      toneRecorderRef.current.dispose()
+      toneRecorderRef.current = null
+    }
+  }, [])
 
   useImperativeHandle(ref, () => ({
     noteOn(note) {
@@ -25,16 +36,23 @@ const Recorder = forwardRef(function Recorder({ onSaveRecording }, ref) {
     },
   }), [])
 
-  function startRecording() {
-    eventsRef.current    = []
+  async function startRecording() {
+    await Tone.start()
+    eventsRef.current     = []
     activeNotesRef.current = {}
-    startTimeRef.current = Tone.now()
+    startTimeRef.current  = Tone.now()
     isRecordingRef.current = true
     setIsRecording(true)
     setRecorded(null)
+    setAudioBlob(null)
+
+    const rec = new Tone.Recorder()
+    Tone.getDestination().connect(rec)
+    await rec.start()
+    toneRecorderRef.current = rec
   }
 
-  function stopRecording() {
+  async function stopRecording() {
     isRecordingRef.current = false
     setIsRecording(false)
 
@@ -44,6 +62,14 @@ const Recorder = forwardRef(function Recorder({ onSaveRecording }, ref) {
       eventsRef.current.push({ note, beat: startBeat, duration: Math.max(0.125, now - startBeat) })
     }
     activeNotesRef.current = {}
+
+    // Stop audio capture
+    if (toneRecorderRef.current) {
+      const blob = await toneRecorderRef.current.stop()
+      toneRecorderRef.current.dispose()
+      toneRecorderRef.current = null
+      if (blob && blob.size > 0) setAudioBlob(blob)
+    }
 
     const events = [...eventsRef.current].sort((a, b) => a.beat - b.beat)
     if (events.length > 0) {
@@ -62,7 +88,22 @@ const Recorder = forwardRef(function Recorder({ onSaveRecording }, ref) {
     if (recorded && onSaveRecording) {
       onSaveRecording(recorded)
       setRecorded(null)
+      setAudioBlob(null)
     }
+  }
+
+  function handleExportMidi() {
+    if (recorded) exportMidi(recorded, bpm, 'recording.mid')
+  }
+
+  function handleExportAudio() {
+    if (!audioBlob) return
+    const url = URL.createObjectURL(audioBlob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'recording.webm'
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   return (
@@ -105,7 +146,7 @@ const Recorder = forwardRef(function Recorder({ onSaveRecording }, ref) {
 
       {isRecording && (
         <p className="text-xs text-center" style={{ color: 'rgba(148,163,184,0.6)' }}>
-          Play notes on your keyboard — timing is captured live
+          Play notes on your keyboard — timing and audio are captured live
         </p>
       )}
 
@@ -119,32 +160,61 @@ const Recorder = forwardRef(function Recorder({ onSaveRecording }, ref) {
               </p>
               <p className="text-xs mt-0.5" style={{ color: 'rgba(148,163,184,0.5)' }}>
                 ~{recorded.bars} bar{recorded.bars !== 1 ? 's' : ''}
+                {audioBlob ? ' · audio ready' : ''}
               </p>
             </div>
+            <button
+              onClick={() => { setRecorded(null); setAudioBlob(null) }}
+              className="px-3 py-1.5 rounded-lg text-xs transition-all"
+              style={{
+                background: 'rgba(30,30,46,0.8)',
+                border: '1px solid rgba(46,46,74,0.5)',
+                color: 'rgba(148,163,184,0.6)',
+              }}
+            >
+              Discard
+            </button>
+          </div>
+
+          {/* Action buttons */}
+          <div className="flex flex-col gap-2">
+            <button
+              onClick={saveRecording}
+              className="w-full py-2 rounded-lg text-xs font-semibold transition-all"
+              style={{
+                background: 'rgba(6,182,212,0.2)',
+                border: '1px solid rgba(6,182,212,0.5)',
+                color: '#22d3ee',
+                boxShadow: '0 0 12px rgba(6,182,212,0.2)',
+              }}
+            >
+              Save to Inventory
+            </button>
             <div className="flex gap-2">
               <button
-                onClick={() => setRecorded(null)}
-                className="px-3 py-1.5 rounded-lg text-xs transition-all"
+                onClick={handleExportMidi}
+                className="flex-1 py-2 rounded-lg text-xs font-semibold transition-all"
                 style={{
-                  background: 'rgba(30,30,46,0.8)',
-                  border: '1px solid rgba(46,46,74,0.5)',
-                  color: 'rgba(148,163,184,0.6)',
+                  background: 'rgba(168,85,247,0.15)',
+                  border: '1px solid rgba(168,85,247,0.4)',
+                  color: '#c084fc',
                 }}
               >
-                Discard
+                Export MIDI
               </button>
-              <button
-                onClick={saveRecording}
-                className="px-4 py-1.5 rounded-lg text-xs font-semibold transition-all"
-                style={{
-                  background: 'rgba(6,182,212,0.2)',
-                  border: '1px solid rgba(6,182,212,0.5)',
-                  color: '#22d3ee',
-                  boxShadow: '0 0 12px rgba(6,182,212,0.2)',
-                }}
-              >
-                Save to Inventory
-              </button>
+              {audioBlob && (
+                <button
+                  onClick={handleExportAudio}
+                  className="flex-1 py-2 rounded-lg text-xs font-semibold transition-all"
+                  style={{
+                    background: 'rgba(236,72,153,0.15)',
+                    border: '1px solid rgba(236,72,153,0.4)',
+                    color: '#f472b6',
+                  }}
+                >
+                  Export Audio
+                </button>
+              )}
             </div>
           </div>
         </div>
