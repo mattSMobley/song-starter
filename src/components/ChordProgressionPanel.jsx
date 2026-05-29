@@ -5,7 +5,7 @@ import { getProgressions } from '../audio/chordProgressions.js'
 
 const BEATS_OPTIONS = [1, 2, 4]
 
-export default function ChordProgressionPanel({ root, scale, bpm, onChordChange }) {
+export default function ChordProgressionPanel({ root, scale, bpm, onChordChange, onActiveProgChange }) {
   const [beatsPerChord, setBeatsPerChord] = useState(2)
   const [playingIdx, setPlayingIdx] = useState(-1)
   const [activeChord, setActiveChord] = useState(-1)
@@ -24,6 +24,7 @@ export default function ChordProgressionPanel({ root, scale, bpm, onChordChange 
     setPlayingIdx(-1)
     setActiveChord(-1)
     onChordChange?.([])
+    onActiveProgChange?.(null, beatsPerChord)
     if (partRef.current) { partRef.current.dispose(); partRef.current = null }
     Tone.getTransport().stop()
     Tone.getTransport().position = 0
@@ -36,6 +37,7 @@ export default function ChordProgressionPanel({ root, scale, bpm, onChordChange 
 
     playingIdxRef.current = idx
     setPlayingIdx(idx)
+    onActiveProgChange?.(progressions[idx], beatsPerChord)
 
     const prog = progressions[idx]
     const secPerBeat = 60 / bpm

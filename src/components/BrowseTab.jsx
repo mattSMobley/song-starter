@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import MelodyCard from './MelodyCard.jsx'
 import DrumCard from './DrumCard.jsx'
 import { PRESET_LOOPS, DRUM_LOOPS, CATEGORIES } from '../audio/loopLibrary.js'
+import { rootSemitones, transposeMelody } from '../audio/scales.js'
 
 const ALL_LOOPS = [
   ...PRESET_LOOPS.map(l => ({ ...l, isDrum: false })),
@@ -14,24 +15,36 @@ function countForCat(c) {
   return PRESET_LOOPS.filter(l => l.category === c).length
 }
 
-// Only show categories that actually have loops
 const ACTIVE_CATEGORIES = CATEGORIES.filter(c => countForCat(c) > 0)
 
-export default function BrowseTab({ bpm, onSave }) {
-  const [cat, setCat] = useState('All')
+export default function BrowseTab({ bpm, onSave, root = 'C' }) {
+  const [cat, setCat]     = useState('All')
   const [query, setQuery] = useState('')
 
   const visible = useMemo(() => {
     let base = cat === 'All'
       ? ALL_LOOPS
       : ALL_LOOPS.filter(l => cat === 'Drums' ? l.isDrum : !l.isDrum && l.category === cat)
-
     if (query.trim()) {
       const q = query.trim().toLowerCase()
       base = base.filter(l => l.name.toLowerCase().includes(q))
     }
     return base
   }, [cat, query])
+
+  // Transpose preset loops to the current app root
+  const visibleTransposed = useMemo(() => {
+    return visible.map(loop => {
+      if (loop.isDrum || !loop.root) return loop
+      const semi = rootSemitones(loop.root, root)
+      if (semi === 0) return loop
+      return {
+        ...loop,
+        ...transposeMelody(loop, semi),
+        root,
+      }
+    })
+  }, [visible, root])
 
   return (
     <div className="flex flex-col h-full gap-4">
@@ -42,7 +55,8 @@ export default function BrowseTab({ bpm, onSave }) {
             Loop Library
           </h2>
           <p className="text-xs mt-0.5" style={{ color: 'rgba(148,163,184,0.45)' }}>
-            <span style={{ color: '#c084fc' }}>{visible.length}</span> loop{visible.length !== 1 ? 's' : ''} · click to preview
+            <span style={{ color: '#c084fc' }}>{visible.length}</span> loops · transposed to{' '}
+            <span style={{ color: '#22d3ee' }}>{root}</span>
           </p>
         </div>
 
@@ -109,7 +123,7 @@ export default function BrowseTab({ bpm, onSave }) {
 
       {/* Grid */}
       <div className="flex-1 overflow-y-auto">
-        {visible.length === 0 ? (
+        {visibleTransposed.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-3"
             style={{ color: 'rgba(148,163,184,0.35)' }}>
             <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -124,7 +138,7 @@ export default function BrowseTab({ bpm, onSave }) {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-4" style={{ gridAutoRows: 'min-content' }}>
-            {visible.map((loop, i) =>
+            {visibleTransposed.map((loop, i) =>
               loop.isDrum
                 ? <DrumCard key={loop.id} loop={loop} index={i} bpm={bpm} />
                 : <MelodyCard key={loop.id} melody={loop} index={i} bpm={bpm} onSave={onSave} />

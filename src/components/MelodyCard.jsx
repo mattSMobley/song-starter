@@ -2,6 +2,9 @@ import { useState, useRef } from 'react'
 import * as Tone from 'tone'
 import { playNote } from '../audio/engine.js'
 import { exportMidi } from '../audio/midiExport.js'
+import { exportMelodyWav } from '../audio/wavExport.js'
+
+const isTouchDevice = () => window.matchMedia('(hover: none)').matches
 
 const NOTE_COLORS = [
   '#7c3aed','#a855f7','#06b6d4','#22d3ee','#ec4899',
@@ -79,6 +82,12 @@ export default function MelodyCard({ melody, index, bpm, onSave, onPlay, isPlayi
     exportMidi(melody, bpm, `melody-${index + 1}.mid`)
   }
 
+  function handleWav() {
+    exportMelodyWav(melody, bpm, `melody-${index + 1}.wav`)
+  }
+
+  const touch = isTouchDevice()
+
   return (
     <div
       className="rounded-2xl animate-slide-in cursor-pointer group"
@@ -112,10 +121,10 @@ export default function MelodyCard({ melody, index, bpm, onSave, onPlay, isPlayi
           </span>
         </div>
         <div className="flex items-center gap-1.5">
-          {/* Save */}
+          {/* Save — always visible on touch, hover on desktop */}
           <button
             onClick={() => onSave && onSave(melody)}
-            className="rounded-lg text-xs transition-all opacity-0 group-hover:opacity-100"
+            className={`rounded-lg text-xs transition-all ${touch ? '' : 'opacity-0 group-hover:opacity-100'}`}
             style={{ padding: '7px 9px', background: 'rgba(6,182,212,0.18)', color: '#22d3ee', border: '1px solid rgba(6,182,212,0.35)', boxShadow: '0 0 10px rgba(6,182,212,0.12)' }}
             title="Save to inventory"
           >
@@ -125,12 +134,26 @@ export default function MelodyCard({ melody, index, bpm, onSave, onPlay, isPlayi
             </svg>
           </button>
 
-          {/* MIDI export */}
+          {/* MIDI export — always visible, hero action */}
           <button
             onClick={handleMidi}
-            className="rounded-lg text-xs transition-all opacity-0 group-hover:opacity-100"
-            style={{ padding: '7px 9px', background: 'rgba(168,85,247,0.15)', color: '#c084fc', border: '1px solid rgba(168,85,247,0.3)', boxShadow: '0 0 10px rgba(168,85,247,0.1)' }}
+            className="rounded-lg text-xs transition-all flex items-center gap-1"
+            style={{ padding: '7px 9px', background: 'rgba(168,85,247,0.2)', color: '#c084fc', border: '1px solid rgba(168,85,247,0.4)', boxShadow: '0 0 10px rgba(168,85,247,0.15)' }}
             title="Export MIDI"
+          >
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+              <polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            <span style={{ fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.06em' }}>MIDI</span>
+          </button>
+
+          {/* WAV export */}
+          <button
+            onClick={handleWav}
+            className={`rounded-lg text-xs transition-all ${touch ? '' : 'opacity-0 group-hover:opacity-100'}`}
+            style={{ padding: '7px 9px', background: 'rgba(34,211,238,0.12)', color: '#22d3ee', border: '1px solid rgba(34,211,238,0.3)' }}
+            title="Export WAV"
           >
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>

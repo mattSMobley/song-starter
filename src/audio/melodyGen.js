@@ -42,21 +42,21 @@ function weightedPick(weights) {
   return weights.length - 1
 }
 
-function pickNote(notes, prevIdx, contour, beat, totalBeats, isStrongBeat, isEndPhrase, chordTones) {
+function pickNote(notes, prevIdx, contour, beat, totalBeats, isStrongBeat, isEndPhrase, chordTones, chordPCs) {
   const n = notes.length
   const progress = beat / totalBeats  // 0 → 1
 
-  return weightedPick(notes.map((_, i) => {
+  return weightedPick(notes.map((note, i) => {
     const dist = Math.abs(i - prevIdx)
     let w = 1
 
     // ── Step motion: strongly prefer moving by 1–2 scale steps ──────────────
-    if (dist === 0) w = 0.15        // repeating same note: very rare
-    else if (dist === 1) w = 5.0    // half-step / adjacent: most common
-    else if (dist === 2) w = 3.5    // skip of a third: very natural
-    else if (dist === 3) w = 1.2    // fourth: occasional
-    else if (dist === 4) w = 0.5    // fifth: rare
-    else w = 0.15 / (dist - 3)      // leaps: rare
+    if (dist === 0) w = 0.15
+    else if (dist === 1) w = 5.0
+    else if (dist === 2) w = 3.5
+    else if (dist === 3) w = 1.2
+    else if (dist === 4) w = 0.5
+    else w = 0.15 / (dist - 3)
 
     // ── Contour bias ─────────────────────────────────────────────────────────
     if (contour === 'ascending')  w *= 1 + (i / n) * 1.5
@@ -65,19 +65,25 @@ function pickNote(notes, prevIdx, contour, beat, totalBeats, isStrongBeat, isEnd
     if (contour === 'valley')     w *= 1 + Math.sin(progress * Math.PI) * ((n - i) / n) * 1.5
     if (contour === 'stepwise')   w *= dist <= 2 ? 2 : 1
 
-    // ── Strong beats: land on chord tones ────────────────────────────────────
+    // ── Strong beats: land on scale chord tones ───────────────────────────────
     if (isStrongBeat && chordTones.has(i)) w *= 3.5
     if (isStrongBeat && !chordTones.has(i)) w *= 0.4
 
+    // ── Harmonic context: boost notes belonging to the active chord ──────────
+    if (chordPCs && chordPCs.size > 0) {
+      const pc = note.replace(/\d+$/, '')
+      if (chordPCs.has(pc)) w *= isStrongBeat ? 2.5 : 1.6
+    }
+
     // ── Phrase end: resolve toward root ──────────────────────────────────────
     if (isEndPhrase) {
-      if (i === 0 || i === n) w *= 8      // root or octave strongly preferred
-      else if (i === 1) w *= 2             // neighbor of root acceptable
+      if (i === 0 || i === n) w *= 8
+      else if (i === 1) w *= 2
       else w *= 0.2
     }
 
     // ── Range bias: prefer the middle register, punish extremes ─────────────
-    const rangeCenter = n * 0.4  // slightly below midpoint sounds warmer
+    const rangeCenter = n * 0.4
     const rangeDist = Math.abs(i - rangeCenter) / n
     w *= Math.max(0.2, 1 - rangeDist * 0.8)
 
@@ -85,7 +91,8 @@ function pickNote(notes, prevIdx, contour, beat, totalBeats, isStrongBeat, isEnd
   }))
 }
 
-export function generateMelody(root, scaleName, octaveStart = 4, bars = 2) {
+// chordsContext: { chords: [{notes: string[], ...}], beatsPerChord: number } | null
+export function generateMelody(root, scaleName, octaveStart = 4, bars = 2, chordsContext = null) {
   const scale = getScaleNotes(root, scaleName, octaveStart, 2)
   // Work in roughly one octave + a few extra notes for breathing room
   const octLen = notesPerOctave(scaleName)
@@ -96,6 +103,18 @@ export function generateMelody(root, scaleName, octaveStart = 4, bars = 2) {
   const contour    = pickRandom(CONTOURS)
   const totalBeats = bars * 4
   const chordTones = chordToneIndices(workNotes.length - 1)
+
+  // Build chord pitch-class lookup from optional context
+  let getChordPCs = null
+  if (chordsContext && chordsContext.chords.length > 0) {
+    const { chords, beatsPerChord = 2 } = chordsContext
+    const progLen = chords.length * beatsPerChord
+    getChordPCs = (beat) => {
+      const pos   = beat % progLen
+      const idx   = Math.min(Math.floor(pos / beatsPerChord), chords.length - 1)
+      return new Set(chords[idx].notes.map(n => n.replace(/\d+$/, '')))
+    }
+  }
 
   const events = []
   let beat     = 0
@@ -109,7 +128,7 @@ export function generateMelody(root, scaleName, octaveStart = 4, bars = 2) {
     const dur = rhythm[pos % rhythm.length]
     if (motifBeats + dur > 2) break
     const isStrong = motifBeats === 0
-    const idx = pickNote(workNotes, prevIdx, contour, motifBeats, 2, isStrong, false, chordTones)
+    const idx = pickNote(workNotes, prevIdx, contour, motifBeats, 2, isStrong, false, chordTones, getChordPCs?.(motifBeats))
     motif.push({ relIdx: idx, dur })
     prevIdx = idx
     motifBeats += dur
@@ -135,15 +154,15 @@ export function generateMelody(root, scaleName, octaveStart = 4, bars = 2) {
     const motifPos = pos % (motif.length * 2)
     let idx
 
+    const chordPCs = getChordPCs?.(beat)
     if (isEndPhrase) {
-      idx = pickNote(workNotes, prevIdx, contour, beat, totalBeats, true, true, chordTones)
+      idx = pickNote(workNotes, prevIdx, contour, beat, totalBeats, true, true, chordTones, chordPCs)
     } else if (motifPos < motif.length && beat >= 4 && Math.random() < 0.55) {
-      // Echo motif loosely (same direction as motif, within 1 step)
       const target = motif[motifPos].relIdx
-      const nudge = Math.floor(Math.random() * 3) - 1  // -1, 0, +1
+      const nudge = Math.floor(Math.random() * 3) - 1
       idx = Math.max(0, Math.min(workNotes.length - 1, target + nudge))
     } else {
-      idx = pickNote(workNotes, prevIdx, contour, beat, totalBeats, isBeat1or3, false, chordTones)
+      idx = pickNote(workNotes, prevIdx, contour, beat, totalBeats, isBeat1or3, false, chordTones, chordPCs)
     }
 
     events.push({ note: workNotes[idx], duration: dur, beat })
@@ -164,8 +183,8 @@ export function eventsToTonePart(events, bpm = 120) {
   }))
 }
 
-export function generateVariations(root, scaleName, count = 6, octaveStart = 4, bars = 2) {
+export function generateVariations(root, scaleName, count = 6, octaveStart = 4, bars = 2, chordsContext = null) {
   return Array.from({ length: count }, () =>
-    generateMelody(root, scaleName, octaveStart, bars)
+    generateMelody(root, scaleName, octaveStart, bars, chordsContext)
   )
 }

@@ -40,6 +40,29 @@ export function midiToNoteName(midi) {
   return `${name}${octave}`
 }
 
+export function transposeNote(noteName, semitones) {
+  if (!semitones) return noteName
+  const noteNames = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B']
+  const m = noteName.match(/^([A-G]#?)(-?\d+)$/)
+  if (!m) return noteName
+  const pc   = noteNames.indexOf(m[1])
+  const midi = (parseInt(m[2]) + 1) * 12 + pc + semitones
+  return midiToNoteName(midi)
+}
+
+export function transposeMelody(melody, semitones) {
+  if (!semitones) return melody
+  return {
+    ...melody,
+    events: melody.events.map(e => ({ ...e, note: transposeNote(e.note, semitones) })),
+    scale:  (melody.scale ?? []).map(n => transposeNote(n, semitones)),
+  }
+}
+
+export function rootSemitones(fromRoot, toRoot) {
+  return (NOTE_TO_MIDI[toRoot] ?? 0) - (NOTE_TO_MIDI[fromRoot] ?? 0)
+}
+
 export function snapToScale(midiNote, root, scaleName) {
   const intervals = SCALE_INTERVALS[scaleName] || SCALE_INTERVALS.major
   const rootMidi  = NOTE_TO_MIDI[root] ?? 0

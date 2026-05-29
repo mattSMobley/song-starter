@@ -712,6 +712,33 @@ export function getTempo() {
   return Math.round(Tone.getTransport().bpm.value)
 }
 
+// ── Metronome ─────────────────────────────────────────────────────────────────
+let _metroLoop = null
+
+export function setMetronome(active) {
+  if (!active) {
+    if (_metroLoop) { _metroLoop.dispose(); _metroLoop = null }
+    return
+  }
+  if (_metroLoop) return  // already running
+
+  let beat = 0
+  _metroLoop = new Tone.Loop((time) => {
+    // Accent beat 1 of each bar with a slightly louder, pitched click
+    const isDownbeat = beat % 4 === 0
+    if (drumHihatC) {
+      drumHihatC.triggerAttackRelease(isDownbeat ? '16n' : '32n', time)
+    }
+    beat++
+  }, '4n')
+
+  _metroLoop.start(0)
+  if (Tone.getTransport().state !== 'started') {
+    Tone.getTransport().position = 0
+    Tone.getTransport().start()
+  }
+}
+
 export const INSTRUMENTS = [
   { id: 'keys',    label: 'Keys',    icon: '🎹', variations: ['Piano ✦', 'E. Piano', 'Organ', 'Clav', 'Vibes'] },
   { id: 'pad',     label: 'Pad',     icon: '🌊', variations: ['Warm', 'Crystal', 'Aether', 'Pulse', 'Glass'] },
