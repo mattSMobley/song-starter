@@ -25,93 +25,115 @@ const SUFFIX = {
   dim7:'dim7', m7b5:'m7b5', sus4:'sus4',
 }
 
-// semi = semitone offset from root key
+// beats[] = relative durations per chord, multiplied by the user's "Beats" setting.
+// [1,1,2] at Beats=2  →  2+2+4 beats  (quick-quick-land, 2 bars)
+// [1,1,2] at Beats=4  →  4+4+8 beats  (spacious, 4 bars)
+// Omit beats for uniform progressions — every chord plays for exactly Beats beats.
+
 const SCALE_PROGRESSIONS = {
   major: [
-    { name:'Pop',          steps:[{s:0,t:'maj',n:'I'},{s:7,t:'maj',n:'V'},{s:9,t:'min',n:'vi'},{s:5,t:'maj',n:'IV'}] },
-    { name:'Classic',      steps:[{s:0,t:'maj',n:'I'},{s:5,t:'maj',n:'IV'},{s:7,t:'maj',n:'V'},{s:0,t:'maj',n:'I'}] },
-    { name:'50s',          steps:[{s:0,t:'maj',n:'I'},{s:9,t:'min',n:'vi'},{s:5,t:'maj',n:'IV'},{s:7,t:'maj',n:'V'}] },
-    { name:'Emotional',    steps:[{s:9,t:'min',n:'vi'},{s:5,t:'maj',n:'IV'},{s:0,t:'maj',n:'I'},{s:7,t:'maj',n:'V'}] },
-    { name:'Jazz ii–V–I',  steps:[{s:2,t:'min7',n:'IIm7'},{s:7,t:'dom7',n:'V7'},{s:0,t:'maj7',n:'Imaj7'}] },
-    { name:'Andalusian',   steps:[{s:9,t:'min',n:'vi'},{s:7,t:'maj',n:'V'},{s:5,t:'maj',n:'IV'},{s:4,t:'maj',n:'III'}] },
+    { name:'Pop',         steps:[{s:0,t:'maj',n:'I'},{s:7,t:'maj',n:'V'},{s:9,t:'min',n:'vi'},{s:5,t:'maj',n:'IV'}] },
+    { name:'50s',         steps:[{s:0,t:'maj',n:'I'},{s:9,t:'min',n:'vi'},{s:5,t:'maj',n:'IV'},{s:7,t:'maj',n:'V'}] },
+    { name:'Emotional',   steps:[{s:9,t:'min',n:'vi'},{s:5,t:'maj',n:'IV'},{s:0,t:'maj',n:'I'},{s:7,t:'maj',n:'V'}] },
+    { name:'Andalusian',  steps:[{s:9,t:'min',n:'vi'},{s:7,t:'maj',n:'V'},{s:5,t:'maj',n:'IV'},{s:4,t:'maj',n:'III'}] },
+    // 3-chord with built-in rhythm feel
+    { name:'Jazz ii-V-I', steps:[{s:2,t:'min7',n:'IIm7'},{s:7,t:'dom7',n:'V7'},{s:0,t:'maj7',n:'Imaj7'}], beats:[1,1,2] },
+    { name:'Resolve',     steps:[{s:5,t:'maj',n:'IV'},{s:7,t:'dom7',n:'V7'},{s:0,t:'maj',n:'I'}],         beats:[1,1,2] },
+    { name:'Lopsided',    steps:[{s:0,t:'maj',n:'I'},{s:5,t:'maj',n:'IV'},{s:7,t:'maj',n:'V'}],           beats:[2,1,1] },
+    // 2-chord vamp
+    { name:'Two-Chord',   steps:[{s:0,t:'maj',n:'I'},{s:5,t:'maj',n:'IV'}] },
   ],
   minor: [
-    { name:'Epic',         steps:[{s:0,t:'min',n:'i'},{s:8,t:'maj',n:'VI'},{s:3,t:'maj',n:'III'},{s:10,t:'maj',n:'VII'}] },
-    { name:'Dark',         steps:[{s:0,t:'min',n:'i'},{s:10,t:'maj',n:'VII'},{s:8,t:'maj',n:'VI'},{s:10,t:'maj',n:'VII'}] },
-    { name:'Minor Pop',    steps:[{s:0,t:'min',n:'i'},{s:10,t:'maj',n:'VII'},{s:8,t:'maj',n:'VI'},{s:3,t:'maj',n:'III'}] },
-    { name:'Melancholic',  steps:[{s:0,t:'min',n:'i'},{s:5,t:'min',n:'iv'},{s:10,t:'maj',n:'VII'},{s:3,t:'maj',n:'III'}] },
-    { name:'Jazz Minor',   steps:[{s:2,t:'m7b5',n:'iiø'},{s:7,t:'dom7',n:'V7'},{s:0,t:'min7',n:'im7'}] },
-    { name:'Cinematic',    steps:[{s:0,t:'min',n:'i'},{s:8,t:'maj',n:'VI'},{s:3,t:'maj',n:'III'},{s:7,t:'maj',n:'v'}] },
+    { name:'Epic',        steps:[{s:0,t:'min',n:'i'},{s:8,t:'maj',n:'VI'},{s:3,t:'maj',n:'III'},{s:10,t:'maj',n:'VII'}] },
+    { name:'Minor Pop',   steps:[{s:0,t:'min',n:'i'},{s:10,t:'maj',n:'VII'},{s:8,t:'maj',n:'VI'},{s:3,t:'maj',n:'III'}] },
+    { name:'Melancholic', steps:[{s:0,t:'min',n:'i'},{s:5,t:'min',n:'iv'},{s:10,t:'maj',n:'VII'},{s:3,t:'maj',n:'III'}] },
+    { name:'Cinematic',   steps:[{s:0,t:'min',n:'i'},{s:8,t:'maj',n:'VI'},{s:3,t:'maj',n:'III'},{s:7,t:'maj',n:'v'}] },
+    // 3-chord rhythm-feel
+    { name:'Jazz Minor',  steps:[{s:2,t:'m7b5',n:'iio'},{s:7,t:'dom7',n:'V7'},{s:0,t:'min7',n:'im7'}],  beats:[1,1,2] },
+    { name:'Three Drop',  steps:[{s:0,t:'min',n:'i'},{s:8,t:'maj',n:'VI'},{s:10,t:'maj',n:'VII'}],       beats:[1,1,2] },
+    { name:'Dark Front',  steps:[{s:0,t:'min',n:'i'},{s:5,t:'min',n:'iv'},{s:10,t:'maj',n:'VII'}],       beats:[2,1,1] },
+    // 2-chord vamp
+    { name:'Power Vamp',  steps:[{s:0,t:'min',n:'i'},{s:10,t:'maj',n:'VII'}] },
   ],
   dorian: [
-    { name:'Dorian Groove', steps:[{s:0,t:'min',n:'i'},{s:5,t:'maj',n:'IV'},{s:0,t:'min',n:'i'},{s:5,t:'maj',n:'IV'}] },
-    { name:'Modal',         steps:[{s:0,t:'min',n:'i'},{s:5,t:'maj',n:'IV'},{s:10,t:'maj',n:'VII'},{s:0,t:'min',n:'i'}] },
-    { name:'Funky',         steps:[{s:0,t:'min',n:'i'},{s:2,t:'min',n:'ii'},{s:5,t:'maj',n:'IV'},{s:0,t:'min',n:'i'}] },
-    { name:'Soul 7ths',     steps:[{s:0,t:'min7',n:'im7'},{s:5,t:'maj7',n:'IVmaj7'},{s:2,t:'min7',n:'iim7'},{s:5,t:'maj',n:'IV'}] },
-    { name:'Space',         steps:[{s:0,t:'min',n:'i'},{s:10,t:'maj',n:'VII'},{s:3,t:'maj',n:'III'},{s:5,t:'maj',n:'IV'}] },
-    { name:'Journey',       steps:[{s:0,t:'min',n:'i'},{s:5,t:'maj',n:'IV'},{s:2,t:'min',n:'ii'},{s:7,t:'dom7',n:'V7'}] },
+    { name:'Modal',        steps:[{s:0,t:'min',n:'i'},{s:5,t:'maj',n:'IV'},{s:10,t:'maj',n:'VII'},{s:0,t:'min',n:'i'}] },
+    { name:'Funky',        steps:[{s:0,t:'min',n:'i'},{s:2,t:'min',n:'ii'},{s:5,t:'maj',n:'IV'},{s:0,t:'min',n:'i'}] },
+    { name:'Soul 7ths',    steps:[{s:0,t:'min7',n:'im7'},{s:5,t:'maj7',n:'IVmaj7'},{s:2,t:'min7',n:'iim7'},{s:5,t:'maj',n:'IV'}] },
+    { name:'Space',        steps:[{s:0,t:'min',n:'i'},{s:10,t:'maj',n:'VII'},{s:3,t:'maj',n:'III'},{s:5,t:'maj',n:'IV'}] },
+    { name:'Journey',      steps:[{s:0,t:'min',n:'i'},{s:5,t:'maj',n:'IV'},{s:2,t:'min',n:'ii'},{s:7,t:'dom7',n:'V7'}] },
+    // 3-chord
+    { name:'Groove Three', steps:[{s:0,t:'min7',n:'im7'},{s:5,t:'maj',n:'IV'},{s:10,t:'maj',n:'VII'}],   beats:[2,1,1] },
+    // 2-chord vamp — the quintessential dorian sound (Miles Davis, Herbie Hancock)
+    { name:'Dorian Vamp',  steps:[{s:0,t:'min7',n:'im7'},{s:5,t:'maj7',n:'IVmaj7'}] },
   ],
   phrygian: [
-    { name:'Flamenco',    steps:[{s:0,t:'min',n:'i'},{s:1,t:'maj',n:'II'},{s:0,t:'min',n:'i'},{s:1,t:'maj',n:'II'}] },
-    { name:'Spanish',     steps:[{s:1,t:'maj',n:'II'},{s:3,t:'maj',n:'III'},{s:1,t:'maj',n:'II'},{s:0,t:'min',n:'i'}] },
-    { name:'Metal',       steps:[{s:0,t:'min',n:'i'},{s:1,t:'maj',n:'bII'},{s:3,t:'maj',n:'III'},{s:1,t:'maj',n:'bII'}] },
-    { name:'Eastern',     steps:[{s:1,t:'maj',n:'bII'},{s:0,t:'min',n:'i'},{s:10,t:'maj',n:'bVII'},{s:0,t:'min',n:'i'}] },
-    { name:'Tension',     steps:[{s:0,t:'min',n:'i'},{s:5,t:'min',n:'iv'},{s:1,t:'maj',n:'bII'},{s:0,t:'min',n:'i'}] },
-    { name:'Dark Fall',   steps:[{s:0,t:'min',n:'i'},{s:8,t:'maj',n:'bVI'},{s:10,t:'maj',n:'bVII'},{s:1,t:'maj',n:'bII'}] },
+    { name:'Flamenco',   steps:[{s:0,t:'min',n:'i'},{s:1,t:'maj',n:'II'},{s:0,t:'min',n:'i'},{s:1,t:'maj',n:'II'}] },
+    { name:'Spanish',    steps:[{s:1,t:'maj',n:'II'},{s:3,t:'maj',n:'III'},{s:1,t:'maj',n:'II'},{s:0,t:'min',n:'i'}] },
+    { name:'Metal',      steps:[{s:0,t:'min',n:'i'},{s:1,t:'maj',n:'bII'},{s:3,t:'maj',n:'III'},{s:1,t:'maj',n:'bII'}] },
+    { name:'Eastern',    steps:[{s:1,t:'maj',n:'bII'},{s:0,t:'min',n:'i'},{s:10,t:'maj',n:'bVII'},{s:0,t:'min',n:'i'}] },
+    { name:'Tension',    steps:[{s:0,t:'min',n:'i'},{s:5,t:'min',n:'iv'},{s:1,t:'maj',n:'bII'},{s:0,t:'min',n:'i'}] },
+    { name:'Dark Fall',  steps:[{s:0,t:'min',n:'i'},{s:8,t:'maj',n:'bVI'},{s:10,t:'maj',n:'bVII'},{s:1,t:'maj',n:'bII'}] },
   ],
   lydian: [
-    { name:'Dreamy',      steps:[{s:0,t:'maj',n:'I'},{s:2,t:'maj',n:'II'},{s:0,t:'maj',n:'I'},{s:2,t:'maj',n:'II'}] },
-    { name:'Film Score',  steps:[{s:0,t:'maj',n:'I'},{s:2,t:'maj',n:'II'},{s:9,t:'min',n:'vi'},{s:7,t:'maj',n:'V'}] },
-    { name:'Floating',    steps:[{s:0,t:'maj7',n:'Imaj7'},{s:2,t:'maj7',n:'IImaj7'},{s:11,t:'min7',n:'viim7'},{s:0,t:'maj7',n:'Imaj7'}] },
-    { name:'Sunshine',    steps:[{s:0,t:'maj',n:'I'},{s:7,t:'maj',n:'V'},{s:9,t:'min',n:'vi'},{s:2,t:'maj',n:'II'}] },
-    { name:'Wonder',      steps:[{s:0,t:'maj7',n:'Imaj7'},{s:9,t:'min7',n:'vim7'},{s:2,t:'maj7',n:'IImaj7'},{s:7,t:'maj',n:'V'}] },
-    { name:'Cosmic',      steps:[{s:0,t:'maj',n:'I'},{s:2,t:'maj',n:'II'},{s:4,t:'min',n:'iii'},{s:2,t:'maj',n:'II'}] },
+    { name:'Dreamy',     steps:[{s:0,t:'maj',n:'I'},{s:2,t:'maj',n:'II'},{s:0,t:'maj',n:'I'},{s:2,t:'maj',n:'II'}] },
+    { name:'Film Score', steps:[{s:0,t:'maj',n:'I'},{s:2,t:'maj',n:'II'},{s:9,t:'min',n:'vi'},{s:7,t:'maj',n:'V'}] },
+    { name:'Floating',   steps:[{s:0,t:'maj7',n:'Imaj7'},{s:2,t:'maj7',n:'IImaj7'},{s:11,t:'min7',n:'viim7'},{s:0,t:'maj7',n:'Imaj7'}] },
+    { name:'Sunshine',   steps:[{s:0,t:'maj',n:'I'},{s:7,t:'maj',n:'V'},{s:9,t:'min',n:'vi'},{s:2,t:'maj',n:'II'}] },
+    { name:'Wonder',     steps:[{s:0,t:'maj7',n:'Imaj7'},{s:9,t:'min7',n:'vim7'},{s:2,t:'maj7',n:'IImaj7'},{s:7,t:'maj',n:'V'}] },
+    { name:'Cosmic',     steps:[{s:0,t:'maj',n:'I'},{s:2,t:'maj',n:'II'},{s:4,t:'min',n:'iii'},{s:2,t:'maj',n:'II'}] },
   ],
   mixolydian: [
-    { name:'Rock',        steps:[{s:0,t:'maj',n:'I'},{s:10,t:'maj',n:'VII'},{s:5,t:'maj',n:'IV'},{s:0,t:'maj',n:'I'}] },
-    { name:'Bluesy',      steps:[{s:0,t:'maj',n:'I'},{s:5,t:'maj',n:'IV'},{s:10,t:'maj',n:'VII'},{s:5,t:'maj',n:'IV'}] },
-    { name:'Celtic',      steps:[{s:0,t:'maj',n:'I'},{s:10,t:'maj',n:'VII'},{s:5,t:'maj',n:'IV'},{s:10,t:'maj',n:'VII'}] },
-    { name:'Swampy',      steps:[{s:0,t:'dom7',n:'I7'},{s:5,t:'dom7',n:'IV7'},{s:10,t:'maj',n:'VII'},{s:5,t:'dom7',n:'IV7'}] },
-    { name:'Cinematic',   steps:[{s:0,t:'maj',n:'I'},{s:9,t:'min',n:'vi'},{s:5,t:'maj',n:'IV'},{s:10,t:'maj',n:'VII'}] },
-    { name:'Hard Rock',   steps:[{s:0,t:'maj',n:'I'},{s:2,t:'min',n:'ii'},{s:10,t:'maj',n:'VII'},{s:5,t:'maj',n:'IV'}] },
+    { name:'Rock',       steps:[{s:0,t:'maj',n:'I'},{s:10,t:'maj',n:'VII'},{s:5,t:'maj',n:'IV'},{s:0,t:'maj',n:'I'}] },
+    { name:'Bluesy',     steps:[{s:0,t:'maj',n:'I'},{s:5,t:'maj',n:'IV'},{s:10,t:'maj',n:'VII'},{s:5,t:'maj',n:'IV'}] },
+    { name:'Celtic',     steps:[{s:0,t:'maj',n:'I'},{s:10,t:'maj',n:'VII'},{s:5,t:'maj',n:'IV'},{s:10,t:'maj',n:'VII'}] },
+    { name:'Swampy',     steps:[{s:0,t:'dom7',n:'I7'},{s:5,t:'dom7',n:'IV7'},{s:10,t:'maj',n:'VII'},{s:5,t:'dom7',n:'IV7'}] },
+    { name:'Cinematic',  steps:[{s:0,t:'maj',n:'I'},{s:9,t:'min',n:'vi'},{s:5,t:'maj',n:'IV'},{s:10,t:'maj',n:'VII'}] },
+    { name:'Hard Rock',  steps:[{s:0,t:'maj',n:'I'},{s:2,t:'min',n:'ii'},{s:10,t:'maj',n:'VII'},{s:5,t:'maj',n:'IV'}] },
+    // 3-chord
+    { name:'Big Resolve',steps:[{s:5,t:'maj',n:'IV'},{s:10,t:'maj',n:'VII'},{s:0,t:'maj',n:'I'}],        beats:[1,1,2] },
+    // 2-chord vamp — classic rock riff
+    { name:'Rock Vamp',  steps:[{s:0,t:'maj',n:'I'},{s:10,t:'maj',n:'VII'}] },
   ],
   pentatonic: [
-    { name:'Simple',      steps:[{s:0,t:'maj',n:'I'},{s:7,t:'maj',n:'V'},{s:5,t:'maj',n:'IV'},{s:0,t:'maj',n:'I'}] },
-    { name:'Country',     steps:[{s:0,t:'maj',n:'I'},{s:5,t:'maj',n:'IV'},{s:0,t:'maj',n:'I'},{s:7,t:'maj',n:'V'}] },
-    { name:'Uplifting',   steps:[{s:0,t:'maj',n:'I'},{s:9,t:'min',n:'vi'},{s:5,t:'maj',n:'IV'},{s:7,t:'maj',n:'V'}] },
-    { name:'Gospel',      steps:[{s:0,t:'maj',n:'I'},{s:5,t:'maj',n:'IV'},{s:7,t:'maj',n:'V'},{s:5,t:'maj',n:'IV'}] },
-    { name:'Festival',    steps:[{s:0,t:'maj',n:'I'},{s:7,t:'maj',n:'V'},{s:9,t:'min',n:'vi'},{s:7,t:'maj',n:'V'}] },
-    { name:'Campfire',    steps:[{s:0,t:'maj',n:'I'},{s:9,t:'min',n:'vi'},{s:5,t:'maj',n:'IV'},{s:7,t:'maj',n:'V'}] },
+    { name:'Simple',     steps:[{s:0,t:'maj',n:'I'},{s:7,t:'maj',n:'V'},{s:5,t:'maj',n:'IV'},{s:0,t:'maj',n:'I'}] },
+    { name:'Country',    steps:[{s:0,t:'maj',n:'I'},{s:5,t:'maj',n:'IV'},{s:0,t:'maj',n:'I'},{s:7,t:'maj',n:'V'}] },
+    { name:'Uplifting',  steps:[{s:0,t:'maj',n:'I'},{s:9,t:'min',n:'vi'},{s:5,t:'maj',n:'IV'},{s:7,t:'maj',n:'V'}] },
+    { name:'Festival',   steps:[{s:0,t:'maj',n:'I'},{s:7,t:'maj',n:'V'},{s:9,t:'min',n:'vi'},{s:7,t:'maj',n:'V'}] },
+    { name:'Rock',       steps:[{s:0,t:'maj',n:'I'},{s:10,t:'maj',n:'bVII'},{s:5,t:'maj',n:'IV'},{s:0,t:'maj',n:'I'}] },
+    { name:'Disco',      steps:[{s:0,t:'dom7',n:'I7'},{s:5,t:'maj',n:'IV'},{s:9,t:'min',n:'vi'},{s:7,t:'dom7',n:'V7'}] },
+    { name:'Funk',       steps:[{s:0,t:'maj',n:'I'},{s:5,t:'dom7',n:'IV7'},{s:2,t:'min7',n:'IIm7'},{s:7,t:'dom7',n:'V7'}] },
+    { name:'Indie Pop',  steps:[{s:0,t:'maj',n:'I'},{s:2,t:'min',n:'ii'},{s:5,t:'maj',n:'IV'},{s:0,t:'maj',n:'I'}] },
   ],
   'penta-minor': [
-    { name:'Minor Groove', steps:[{s:0,t:'min',n:'i'},{s:7,t:'min',n:'v'},{s:3,t:'maj',n:'III'},{s:0,t:'min',n:'i'}] },
-    { name:'Hip Hop',      steps:[{s:0,t:'min',n:'i'},{s:3,t:'maj',n:'III'},{s:10,t:'maj',n:'VII'},{s:3,t:'maj',n:'III'}] },
-    { name:'Blues Feel',   steps:[{s:0,t:'min',n:'i'},{s:5,t:'min',n:'iv'},{s:10,t:'maj',n:'VII'},{s:5,t:'min',n:'iv'}] },
-    { name:'Stoner',       steps:[{s:0,t:'min',n:'i'},{s:10,t:'maj',n:'VII'},{s:5,t:'min',n:'iv'},{s:3,t:'maj',n:'III'}] },
-    { name:'Drill',        steps:[{s:0,t:'min',n:'i'},{s:10,t:'maj',n:'VII'},{s:8,t:'maj',n:'VI'},{s:10,t:'maj',n:'VII'}] },
-    { name:'Dark R&B',     steps:[{s:0,t:'min7',n:'im7'},{s:3,t:'maj',n:'III'},{s:8,t:'maj',n:'VI'},{s:10,t:'maj',n:'VII'}] },
+    { name:'Minor Groove',steps:[{s:0,t:'min',n:'i'},{s:7,t:'min',n:'v'},{s:3,t:'maj',n:'III'},{s:0,t:'min',n:'i'}] },
+    { name:'Hip Hop',     steps:[{s:0,t:'min',n:'i'},{s:3,t:'maj',n:'III'},{s:10,t:'maj',n:'VII'},{s:3,t:'maj',n:'III'}] },
+    { name:'Blues Feel',  steps:[{s:0,t:'min',n:'i'},{s:5,t:'min',n:'iv'},{s:10,t:'maj',n:'VII'},{s:5,t:'min',n:'iv'}] },
+    { name:'Stoner',      steps:[{s:0,t:'min',n:'i'},{s:10,t:'maj',n:'VII'},{s:5,t:'min',n:'iv'},{s:3,t:'maj',n:'III'}] },
+    { name:'Drill',       steps:[{s:0,t:'min',n:'i'},{s:10,t:'maj',n:'VII'},{s:8,t:'maj',n:'VI'},{s:10,t:'maj',n:'VII'}] },
+    { name:'Dark R&B',    steps:[{s:0,t:'min7',n:'im7'},{s:3,t:'maj',n:'III'},{s:8,t:'maj',n:'VI'},{s:10,t:'maj',n:'VII'}] },
   ],
   blues: [
-    { name:'12-Bar',       steps:[{s:0,t:'dom7',n:'I7'},{s:5,t:'dom7',n:'IV7'},{s:0,t:'dom7',n:'I7'},{s:7,t:'dom7',n:'V7'}] },
-    { name:'Quick Four',   steps:[{s:0,t:'dom7',n:'I7'},{s:5,t:'dom7',n:'IV7'},{s:0,t:'dom7',n:'I7'},{s:5,t:'dom7',n:'IV7'}] },
-    { name:'Slow Blues',   steps:[{s:0,t:'dom7',n:'I7'},{s:0,t:'dom7',n:'I7'},{s:5,t:'dom7',n:'IV7'},{s:7,t:'dom7',n:'V7'}] },
-    { name:'Jazz Blues',   steps:[{s:0,t:'dom7',n:'I7'},{s:5,t:'dom7',n:'IV7'},{s:2,t:'min7',n:'IIm7'},{s:7,t:'dom7',n:'V7'}] },
-    { name:'Minor Blues',  steps:[{s:0,t:'min7',n:'im7'},{s:5,t:'min7',n:'ivm7'},{s:7,t:'dom7',n:'V7'},{s:0,t:'min7',n:'im7'}] },
-    { name:'Shuffle',      steps:[{s:0,t:'dom7',n:'I7'},{s:5,t:'dom7',n:'IV7'},{s:7,t:'dom7',n:'V7'},{s:5,t:'dom7',n:'IV7'}] },
+    { name:'12-Bar',      steps:[{s:0,t:'dom7',n:'I7'},{s:5,t:'dom7',n:'IV7'},{s:0,t:'dom7',n:'I7'},{s:7,t:'dom7',n:'V7'}] },
+    { name:'Quick Four',  steps:[{s:0,t:'dom7',n:'I7'},{s:5,t:'dom7',n:'IV7'},{s:0,t:'dom7',n:'I7'},{s:5,t:'dom7',n:'IV7'}] },
+    { name:'Slow Blues',  steps:[{s:0,t:'dom7',n:'I7'},{s:0,t:'dom7',n:'I7'},{s:5,t:'dom7',n:'IV7'},{s:7,t:'dom7',n:'V7'}] },
+    { name:'Jazz Blues',  steps:[{s:0,t:'dom7',n:'I7'},{s:5,t:'dom7',n:'IV7'},{s:2,t:'min7',n:'IIm7'},{s:7,t:'dom7',n:'V7'}] },
+    { name:'Minor Blues', steps:[{s:0,t:'min7',n:'im7'},{s:5,t:'min7',n:'ivm7'},{s:7,t:'dom7',n:'V7'},{s:0,t:'min7',n:'im7'}] },
+    { name:'Shuffle',     steps:[{s:0,t:'dom7',n:'I7'},{s:5,t:'dom7',n:'IV7'},{s:7,t:'dom7',n:'V7'},{s:5,t:'dom7',n:'IV7'}] },
+    // 3-chord turnaround
+    { name:'Turnaround',  steps:[{s:0,t:'dom7',n:'I7'},{s:5,t:'dom7',n:'IV7'},{s:7,t:'dom7',n:'V7'}],    beats:[2,1,1] },
   ],
   chromatic: [
-    { name:'Chromatic',    steps:[{s:0,t:'maj',n:'I'},{s:1,t:'maj',n:'bII'},{s:2,t:'maj',n:'II'},{s:3,t:'min',n:'bIII'}] },
-    { name:'Descending',   steps:[{s:0,t:'maj',n:'I'},{s:10,t:'maj',n:'bVII'},{s:8,t:'maj',n:'bVI'},{s:7,t:'maj',n:'V'}] },
-    { name:'Backdoor',     steps:[{s:0,t:'dom7',n:'I7'},{s:5,t:'dom7',n:'IV7'},{s:10,t:'dom7',n:'bVII7'},{s:0,t:'dom7',n:'I7'}] },
+    { name:'Chromatic',   steps:[{s:0,t:'maj',n:'I'},{s:1,t:'maj',n:'bII'},{s:2,t:'maj',n:'II'},{s:3,t:'min',n:'bIII'}] },
+    { name:'Descending',  steps:[{s:0,t:'maj',n:'I'},{s:10,t:'maj',n:'bVII'},{s:8,t:'maj',n:'bVI'},{s:7,t:'maj',n:'V'}] },
+    { name:'Backdoor',    steps:[{s:0,t:'dom7',n:'I7'},{s:5,t:'dom7',n:'IV7'},{s:10,t:'dom7',n:'bVII7'},{s:0,t:'dom7',n:'I7'}] },
     { name:'Chromatic Walk',steps:[{s:0,t:'maj',n:'I'},{s:3,t:'maj',n:'bIII'},{s:5,t:'maj',n:'IV'},{s:8,t:'maj',n:'bVI'}] },
-    { name:'Tritone Sub',  steps:[{s:0,t:'maj7',n:'Imaj7'},{s:1,t:'dom7',n:'bII7'},{s:2,t:'min7',n:'IIm7'},{s:1,t:'dom7',n:'bII7'}] },
-    { name:'Coltrane',     steps:[{s:0,t:'maj7',n:'Imaj7'},{s:4,t:'dom7',n:'III7'},{s:8,t:'maj7',n:'bVImaj7'},{s:0,t:'maj7',n:'Imaj7'}] },
+    { name:'Tritone Sub', steps:[{s:0,t:'maj7',n:'Imaj7'},{s:1,t:'dom7',n:'bII7'},{s:2,t:'min7',n:'IIm7'},{s:1,t:'dom7',n:'bII7'}] },
+    { name:'Coltrane',    steps:[{s:0,t:'maj7',n:'Imaj7'},{s:4,t:'dom7',n:'III7'},{s:8,t:'maj7',n:'bVImaj7'},{s:0,t:'maj7',n:'Imaj7'}] },
   ],
 }
 
 function buildChordNotes(rootPC, semi, chordType) {
   const chordPC = (rootPC + semi) % 12
-  // Keep chord roots near middle C: C4–F4 in oct4, F#3–B3 in oct3
   const rootMidi = chordPC < 6 ? 60 + chordPC : 48 + chordPC
   const intervals = CHORD_INTERVALS[chordType] || CHORD_INTERVALS.maj
   return intervals.map(i => midiToNoteName(rootMidi + i))
@@ -127,8 +149,9 @@ export function getProgressions(root, scaleName) {
   const template = SCALE_PROGRESSIONS[scaleName] ?? SCALE_PROGRESSIONS.major
 
   return template.map(prog => ({
-    name: prog.name,
-    tag:  prog.steps.map(s => s.n).join(' – '),
+    name:   prog.name,
+    beats:  prog.beats ?? null,  // null = uniform (each chord plays for Beats beats)
+    tag:    prog.steps.map(s => s.n).join(' – '),
     chords: prog.steps.map(step => ({
       numeral: step.n,
       label:   chordLabel(rootPC, step.s, step.t),

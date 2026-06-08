@@ -2,16 +2,16 @@ import { useState, useRef, useEffect } from 'react'
 import * as Tone from 'tone'
 import { playDrumHit } from '../audio/engine.js'
 
-const ROWS = ['kick', 'snare', 'hihat']
-const ROW_LABELS = { kick: 'Kick', snare: 'Snare', hihat: 'Hat' }
-const ROW_COLORS = { kick: '#a855f7', snare: '#06b6d4', hihat: '#ec4899' }
-const STEPS = 16
+const ROWS = ['kick', 'snare', 'hihat', 'tom-hi', 'tom-lo']
+const ROW_LABELS = { kick: 'Kick', snare: 'Snare', hihat: 'Hat', 'tom-hi': 'T.Hi', 'tom-lo': 'T.Lo' }
+const ROW_COLORS = { kick: '#a855f7', snare: '#06b6d4', hihat: '#ec4899', 'tom-hi': '#f59e0b', 'tom-lo': '#10b981' }
+const STEPS = 32
 
 function hitsToGrid(hits) {
   const g = {}
   ROWS.forEach(r => { g[r] = new Array(STEPS).fill(false) })
   hits.forEach(h => {
-    const step = Math.round(h.beat * 2) % STEPS
+    const step = Math.round(h.beat * 4) % STEPS
     const row = h.type === 'hihat_open' ? 'hihat' : h.type
     if (ROWS.includes(row)) g[row][step] = true
   })
@@ -123,50 +123,40 @@ export default function DrumCard({ loop, index, bpm }) {
 
       {/* Grid */}
       <div style={{ background: 'rgba(6,6,12,0.6)', borderRadius: 10, padding: '12px', border: '1px solid rgba(46,46,74,0.5)' }}>
-        {/* Playhead bar */}
-        <div className="flex gap-0.5 mb-1.5" style={{ paddingLeft: 38 }}>
-          {Array.from({ length: STEPS }).map((_, s) => (
-            <div key={s} className="flex-1" style={{
-              height: 3, borderRadius: 2,
-              background: playing && s === currentStep
-                ? 'rgba(192,132,252,0.9)'
-                : 'transparent',
-              boxShadow: playing && s === currentStep ? '0 0 6px rgba(192,132,252,0.8)' : 'none',
-              transition: 'background 0.04s',
-            }} />
-          ))}
-        </div>
-
-        <div className="flex flex-col gap-1.5">
+        <div className="flex flex-col gap-1">
           {ROWS.map(row => (
-            <div key={row} className="flex items-center gap-1.5">
-              <span style={{ width: 32, fontSize: '0.6rem', fontWeight: 700, color: ROW_COLORS[row], letterSpacing: '0.1em', flexShrink: 0 }}>
-                {ROW_LABELS[row]}
-              </span>
-              <div className="flex gap-0.5 flex-1">
-                {grid[row].map((on, s) => (
-                  <button
-                    key={s}
-                    onClick={() => toggleStep(row, s)}
-                    className="flex-1 rounded-sm transition-all"
-                    style={{
-                      height: 18,
-                      background: on
-                        ? ROW_COLORS[row]
-                        : playing && s === currentStep
-                          ? 'rgba(255,255,255,0.1)'
-                          : 'rgba(255,255,255,0.04)',
-                      boxShadow: on ? `0 0 6px ${ROW_COLORS[row]}80` : 'none',
-                      border: s % 4 === 0
-                        ? `1px solid ${on ? ROW_COLORS[row] + '80' : 'rgba(124,58,237,0.2)'}`
-                        : `1px solid ${on ? ROW_COLORS[row] + '60' : 'rgba(255,255,255,0.04)'}`,
-                      opacity: on ? 1 : 0.45,
-                      cursor: 'pointer',
-                      padding: 0,
-                    }}
-                  />
-                ))}
-              </div>
+            <div key={row}>
+              {[0, 16].map(barOffset => (
+                <div key={barOffset} className="flex items-center gap-1 mb-px">
+                  <span style={{ width: 30, fontSize: '0.5rem', fontWeight: 700, color: barOffset === 0 ? ROW_COLORS[row] : 'transparent', letterSpacing: '0.06em', flexShrink: 0 }}>
+                    {ROW_LABELS[row]}
+                  </span>
+                  <div className="flex gap-px flex-1">
+                    {Array.from({ length: 16 }).map((_, i) => {
+                      const s = barOffset + i
+                      const on = grid[row][s]
+                      const active = playing && s === currentStep
+                      return (
+                        <button
+                          key={s}
+                          onClick={() => toggleStep(row, s)}
+                          className="flex-1 rounded-sm transition-all"
+                          style={{
+                            height: 13,
+                            background: on ? ROW_COLORS[row] : active ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.04)',
+                            boxShadow: on ? `0 0 4px ${ROW_COLORS[row]}80` : 'none',
+                            border: i % 4 === 0
+                              ? `1px solid ${on ? ROW_COLORS[row] + '80' : 'rgba(124,58,237,0.22)'}`
+                              : `1px solid ${on ? ROW_COLORS[row] + '60' : 'rgba(255,255,255,0.04)'}`,
+                            opacity: on ? 1 : 0.45,
+                            cursor: 'pointer', padding: 0,
+                          }}
+                        />
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
           ))}
         </div>

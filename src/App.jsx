@@ -12,8 +12,10 @@ import ChordProgressionPanel from './components/ChordProgressionPanel.jsx'
 import SessionTab from './components/SessionTab.jsx'
 import BassPedals from './components/BassPedals.jsx'
 import { startAudio, setInstrument, playNote, onSamplerLoading, setTempo, setMetronome, INSTRUMENTS } from './audio/engine.js'
+import VocalMonitor from './components/VocalMonitor.jsx'
+import { useTour } from './tour/useTour.js'
 import { initMidi, getMidiOutputs, selectOutput, setMidiChannel, getMidiChannel, isMidiActive, getSelectedOutputId, onOutputsChange } from './audio/midiOut.js'
-import { ROOTS, SCALE_NAMES, getScaleNotes } from './audio/scales.js'
+import { ROOTS, SCALE_NAMES, getScaleNotes, transposeMelody, rootSemitones } from './audio/scales.js'
 import { generateVariations } from './audio/melodyGen.js'
 import { loadLoops, persistLoop, removeLoop, updateLoop } from './audio/loopStore.js'
 
@@ -46,13 +48,17 @@ export default function App() {
   const [playAllIdx, setPlayAllIdx]       = useState(-1)
   const [octaveMsg, setOctaveMsg]         = useState('')
   const [tapFlash, setTapFlash]           = useState(false)
-  const [showRecord, setShowRecord]       = useState(false)
+  const [recState, setRecState]           = useState({ phase: 'idle', countdown: 0, hasAudio: false, hasNotes: false, isPlayingAudio: false })
   const [inventoryOpen, setInventoryOpen] = useState(false)
   const [metronomeOn, setMetronomeOn]     = useState(false)
+  const [autotuneStrength, setAutotuneStrength] = useState(80)
+  const [bypass, setBypass]               = useState(false)
+  const [micState, setMicState]           = useState({ armed: false, inputNote: '—', targetNote: '—' })
   // Chord progression context for harmony-aware generation
   const [activeProg, setActiveProg]       = useState(null)
   // Loop save counter for auto-naming
   const loopCounterRef                    = useRef(0)
+  const { startTour, maybeAutoStart }     = useTour()
 
   const octaveMsgTimer = useRef(null)
   const tapTimesRef    = useRef([])
@@ -166,6 +172,7 @@ export default function App() {
     onSamplerLoading(setSamplerLoading)
     setStarted(true)
     generateMelodies()
+    maybeAutoStart()
   }
 
   // ── Generate ───────────────────────────────────────────────────────────────
@@ -176,6 +183,15 @@ export default function App() {
       setMelodies(variations)
       setGenerating(false)
     }, 50)
+  }
+
+  // ── Root change: transpose existing melodies instead of clearing them ────────
+  function handleRootChange(newRoot) {
+    if (melodies.length > 0) {
+      const semi = rootSemitones(root, newRoot)
+      if (semi !== 0) setMelodies(prev => prev.map(m => transposeMelody(m, semi)))
+    }
+    setRoot(newRoot)
   }
 
   // ── Instrument ─────────────────────────────────────────────────────────────
@@ -375,6 +391,9 @@ export default function App() {
   }
 
   return (
+    <>
+    <Recorder ref={recorderRef} bpm={bpm} onChange={setRecState}
+      onSaveRecording={(mel) => { handleSaveMelody(mel); setInventoryOpen(true); setActiveTab('Generate') }} />
     <div className="grid-bg flex flex-col" style={{ height: '100vh', background: '#06060c', overflow: 'hidden' }}>
 
       {/* ── Header ── */}
@@ -433,6 +452,23 @@ export default function App() {
               TAP
             </button>
           </div>
+          {/* Tour help */}
+          {started && (
+            <button
+              onClick={startTour}
+              title="Show tour"
+              className="flex items-center justify-center rounded-xl transition-all flex-shrink-0"
+              style={{ width: 32, height: 32,
+                background: 'rgba(255,255,255,0.03)',
+                border: '1px solid rgba(124,58,237,0.25)',
+                color: 'rgba(168,85,247,0.5)',
+                fontSize: '0.72rem', fontWeight: 700, letterSpacing: '-0.01em',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(168,85,247,0.55)'; e.currentTarget.style.color = '#c084fc'; e.currentTarget.style.boxShadow = '0 0 12px rgba(124,58,237,0.25)' }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(124,58,237,0.25)'; e.currentTarget.style.color = 'rgba(168,85,247,0.5)'; e.currentTarget.style.boxShadow = 'none' }}>
+              ?
+            </button>
+          )}
           {/* Metronome toggle */}
           <button
             onClick={toggleMetronome}
@@ -508,7 +544,7 @@ export default function App() {
               {ROOTS.map(r => {
                 const on = root === r
                 return (
-                  <button key={r} onClick={() => setRoot(r)}
+                  <button key={r} onClick={() => handleRootChange(r)}
                     className="rounded-lg text-xs font-mono font-bold transition-all"
                     style={{
                       padding: '11px 4px',
@@ -650,12 +686,61 @@ export default function App() {
                       })
                     })()}
                   </div>
-                  {/* Record button */}
-                  <button onClick={() => setShowRecord(r => !r)}
-                    className="flex items-center justify-center rounded-xl flex-shrink-0 transition-all"
-                    style={{ width: 34, height: 34, background: showRecord ? 'rgba(239,68,68,0.25)' : 'rgba(255,255,255,0.04)', border: showRecord ? '1px solid rgba(239,68,68,0.5)' : '1px solid rgba(255,255,255,0.1)', color: showRecord ? '#f87171' : 'rgba(148,163,184,0.4)' }}>
-                    <div style={{ width: 10, height: 10, borderRadius: '50%', background: 'currentColor' }} />
-                  </button>
+                  {/* Recording controls — mobile inline */}
+                  {recState.phase === 'done' ? (
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      {recState.hasAudio && (
+                        <button onClick={() => recorderRef.current?.toggleAudio()}
+                          className="flex items-center justify-center rounded-xl flex-shrink-0 transition-all"
+                          style={{ width: 32, height: 32,
+                            background: recState.isPlayingAudio ? 'rgba(239,68,68,0.22)' : 'rgba(34,211,238,0.15)',
+                            border: `1px solid ${recState.isPlayingAudio ? 'rgba(239,68,68,0.5)' : 'rgba(34,211,238,0.4)'}`,
+                            color: recState.isPlayingAudio ? '#f87171' : '#22d3ee' }}>
+                          <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor">
+                            {recState.isPlayingAudio
+                              ? <><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></>
+                              : <polygon points="5,3 19,12 5,21"/>}
+                          </svg>
+                        </button>
+                      )}
+                      {recState.hasNotes && (
+                        <button onClick={() => recorderRef.current?.save()}
+                          className="rounded-xl flex-shrink-0 font-semibold transition-all"
+                          style={{ padding: '5px 8px', fontSize: '0.62rem',
+                            background: 'rgba(6,182,212,0.15)', border: '1px solid rgba(6,182,212,0.4)', color: '#22d3ee' }}>
+                          Save
+                        </button>
+                      )}
+                      <button onClick={() => recorderRef.current?.discard()}
+                        className="flex items-center justify-center rounded-xl flex-shrink-0 transition-all"
+                        style={{ width: 28, height: 28, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(148,163,184,0.5)', fontSize: '0.7rem' }}>
+                        ✕
+                      </button>
+                    </div>
+                  ) : recState.phase === 'recording' ? (
+                    <button onClick={() => recorderRef.current?.stop()}
+                      className="flex items-center justify-center rounded-xl flex-shrink-0 transition-all"
+                      style={{ width: 34, height: 34,
+                        background: 'rgba(239,68,68,0.25)', border: '1px solid rgba(239,68,68,0.5)', color: '#f87171',
+                        boxShadow: '0 0 10px rgba(239,68,68,0.3)' }}>
+                      <div style={{ width: 10, height: 10, borderRadius: 2, background: 'currentColor' }} />
+                    </button>
+                  ) : recState.phase === 'countdown' ? (
+                    <span className="flex-shrink-0" style={{ fontSize: '1.3rem', fontWeight: 900, fontFamily: 'monospace', color: '#c084fc', lineHeight: 1, width: 34, textAlign: 'center' }}>
+                      {recState.countdown}
+                    </span>
+                  ) : (
+                    <button onClick={() => recorderRef.current?.start()}
+                      className="flex items-center justify-center rounded-xl flex-shrink-0 transition-all"
+                      style={{ width: 34, height: 34, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(148,163,184,0.4)' }}>
+                      <div style={{ width: 10, height: 10, borderRadius: '50%', background: 'currentColor' }} />
+                    </button>
+                  )}
+                  {/* Mic — mobile */}
+                  <VocalMonitor root={root} scale={scale}
+                    strength={autotuneStrength} bypass={bypass}
+                    onBypassToggle={() => setBypass(b => !b)}
+                    onChange={setMicState} isMobile />
                 </div>
                 <div style={{ overflowX: 'auto', width: '100%' }}>
                   <Piano compact octaveStart={octave} numOctaves={2} keyboardMode={false}
@@ -666,7 +751,7 @@ export default function App() {
             ) : (
               <div className="flex flex-col gap-1">
                 <div className="flex items-center gap-3">
-                  <ChordDisplay activeNotes={activeNotes} />
+                  <div style={{ width: 120, flexShrink: 0 }} />
                   <div className="flex-1" />
                   {samplerLoading && (
                     <div className="flex items-center gap-1.5">
@@ -674,17 +759,81 @@ export default function App() {
                       <span style={{ fontSize: '0.62rem', color: '#22d3ee', letterSpacing: '0.08em' }}>loading…</span>
                     </div>
                   )}
-                  {/* Record toggle */}
-                  <button onClick={() => setShowRecord(r => !r)}
-                    className="flex items-center gap-1.5 rounded-xl font-semibold transition-all"
-                    style={{ padding: '8px 12px', fontSize: '0.72rem',
-                      background: showRecord ? 'linear-gradient(135deg, rgba(239,68,68,0.3), rgba(220,38,38,0.18))' : 'rgba(255,255,255,0.03)',
-                      border: showRecord ? '1px solid rgba(239,68,68,0.5)' : '1px solid rgba(255,255,255,0.07)',
-                      color: showRecord ? '#f87171' : 'rgba(148,163,184,0.4)',
-                      boxShadow: showRecord ? '0 0 14px rgba(239,68,68,0.25)' : 'none' }}>
-                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'currentColor', boxShadow: showRecord ? '0 0 6px currentColor' : 'none' }} />
-                    Rec
-                  </button>
+                  {/* Recording controls — inline, zero extra rows */}
+                  {recState.phase === 'done' ? (
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      {recState.hasAudio && (
+                        <button onClick={() => recorderRef.current?.toggleAudio()}
+                          className="flex items-center gap-1 rounded-lg font-semibold transition-all"
+                          style={{ padding: '6px 10px', fontSize: '0.68rem',
+                            background: recState.isPlayingAudio ? 'rgba(239,68,68,0.22)' : 'rgba(34,211,238,0.15)',
+                            border: `1px solid ${recState.isPlayingAudio ? 'rgba(239,68,68,0.5)' : 'rgba(34,211,238,0.4)'}`,
+                            color: recState.isPlayingAudio ? '#f87171' : '#22d3ee' }}>
+                          <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor">
+                            {recState.isPlayingAudio
+                              ? <><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></>
+                              : <polygon points="5,3 19,12 5,21"/>}
+                          </svg>
+                        </button>
+                      )}
+                      {recState.hasAudio && (
+                        <button onClick={() => recorderRef.current?.downloadAudio()}
+                          className="rounded-lg font-semibold transition-all"
+                          style={{ padding: '6px 8px', fontSize: '0.68rem',
+                            background: 'rgba(236,72,153,0.12)', border: '1px solid rgba(236,72,153,0.3)', color: '#f472b6' }}
+                          title="Download audio">
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                            <polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                          </svg>
+                        </button>
+                      )}
+                      {recState.hasNotes && (
+                        <button onClick={() => recorderRef.current?.save()}
+                          className="rounded-lg font-semibold transition-all"
+                          style={{ padding: '6px 9px', fontSize: '0.68rem',
+                            background: 'rgba(6,182,212,0.15)', border: '1px solid rgba(6,182,212,0.4)', color: '#22d3ee' }}>
+                          Save
+                        </button>
+                      )}
+                      <button onClick={() => recorderRef.current?.discard()}
+                        className="rounded-lg transition-all"
+                        style={{ padding: '6px 8px', fontSize: '0.68rem',
+                          background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(148,163,184,0.5)' }}>
+                        ✕
+                      </button>
+                    </div>
+                  ) : recState.phase === 'recording' ? (
+                    <button onClick={() => recorderRef.current?.stop()}
+                      className="flex items-center gap-1.5 rounded-xl font-semibold transition-all"
+                      style={{ padding: '8px 12px', fontSize: '0.72rem',
+                        background: 'linear-gradient(135deg, rgba(239,68,68,0.3), rgba(220,38,38,0.18))',
+                        border: '1px solid rgba(239,68,68,0.5)', color: '#f87171',
+                        boxShadow: '0 0 14px rgba(239,68,68,0.25)' }}>
+                      <div style={{ width: 8, height: 8, borderRadius: 2, background: 'currentColor' }} />
+                      Stop
+                    </button>
+                  ) : recState.phase === 'countdown' ? (
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span style={{ fontSize: '1.4rem', fontWeight: 900, fontFamily: 'monospace', color: '#c084fc', lineHeight: 1, minWidth: 20, textAlign: 'center' }}>
+                        {recState.countdown}
+                      </span>
+                      <button onClick={() => recorderRef.current?.cancel()}
+                        className="rounded-lg transition-all"
+                        style={{ padding: '5px 8px', fontSize: '0.65rem',
+                          background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(148,163,184,0.4)' }}>
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <button onClick={() => recorderRef.current?.start()}
+                      className="flex items-center gap-1.5 rounded-xl font-semibold transition-all"
+                      style={{ padding: '8px 12px', fontSize: '0.72rem',
+                        background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(148,163,184,0.4)' }}>
+                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'currentColor' }} />
+                      Rec
+                    </button>
+                  )}
                   <button onClick={() => setKeyboardMode(m => !m)}
                     className="flex items-center justify-center gap-1.5 rounded-xl font-semibold transition-all"
                     style={{ padding: '8px 14px', fontSize: '0.72rem',
@@ -702,6 +851,14 @@ export default function App() {
                   </button>
                 </div>
                 <div className="flex items-start gap-3">
+                  {/* Left column: chord display + mic, both pinned to same width */}
+                  <div className="flex flex-col gap-2 flex-shrink-0" style={{ width: 120 }}>
+                    <ChordDisplay compact activeNotes={activeNotes} />
+                    <VocalMonitor root={root} scale={scale}
+                      strength={autotuneStrength} bypass={bypass}
+                      onBypassToggle={() => setBypass(b => !b)}
+                      onChange={setMicState} />
+                  </div>
                   <div className="flex flex-col gap-2" style={{ overflowX: 'auto', flex: 1, minWidth: 0 }}>
                     <Piano octaveStart={octave} numOctaves={2} keyboardMode={keyboardMode}
                       highlightNotes={scaleHighlights} chordNotes={chordHighlights}
@@ -737,33 +894,6 @@ export default function App() {
             )}
           </div>
 
-          {/* Record overlay panel */}
-          {showRecord && (
-            <div className="flex-shrink-0 mx-0"
-              style={{
-                borderBottom: '1px solid rgba(239,68,68,0.3)',
-                background: 'rgba(10,4,18,0.97)',
-                boxShadow: '0 4px 24px rgba(239,68,68,0.1)',
-              }}>
-              <div style={{ padding: isMobile ? '12px 16px' : '12px 32px' }}>
-                <div className="flex items-center justify-between mb-3">
-                  <span style={{ fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgba(248,113,113,0.75)' }}>
-                    Recording
-                  </span>
-                  <button onClick={() => setShowRecord(false)}
-                    style={{ color: 'rgba(148,163,184,0.4)', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.75rem' }}>
-                    ✕ close
-                  </button>
-                </div>
-                <div className="rounded-2xl p-4"
-                  style={{ background: 'rgba(6,20,28,0.7)', border: '1px solid rgba(239,68,68,0.2)' }}>
-                  <Recorder ref={recorderRef} bpm={bpm}
-                    onSaveRecording={(mel) => { handleSaveMelody(mel); setShowRecord(false); setInventoryOpen(true); setActiveTab('Generate') }} />
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* Tab area */}
           <div className="flex-1 flex flex-col overflow-hidden gap-3" style={{ padding: isMobile ? '12px 16px' : '12px 32px' }}>
 
@@ -776,6 +906,7 @@ export default function App() {
                     const on = activeTab === tab
                     return (
                       <button key={tab} onClick={() => setActiveTab(tab)}
+                        {...(tab === 'Session' ? { 'data-tour': 'session-tab' } : {})}
                         className="rounded-xl font-semibold transition-all"
                         style={{
                           padding: isMobile ? '6px 12px' : '6px 18px', fontSize: '0.78rem',
@@ -813,6 +944,7 @@ export default function App() {
                     ))}
                   </div>
                   <button
+                    data-tour="regenerate"
                     onClick={generateMelodies} disabled={generating}
                     className={`flex items-center gap-1.5 rounded-xl font-semibold transition-all flex-shrink-0${!generating ? ' btn-breathe' : ''}`}
                     style={{
@@ -860,7 +992,7 @@ export default function App() {
 
               {/* Generate */}
               <div style={{ display: activeTab === 'Generate' ? 'flex' : 'none', flexDirection: 'column', height: '100%', gap: 12 }}>
-                <div className="flex-1 overflow-y-auto min-h-0">
+                <div data-tour="melody-area" className="flex-1 overflow-y-auto min-h-0">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-4" style={{ gridAutoRows: 'min-content' }}>
                     {melodies.map((melody, i) => (
                       <MelodyCard key={i} melody={melody} index={i} bpm={bpm} onSave={handleSaveMelody}
@@ -908,7 +1040,10 @@ export default function App() {
 
               {/* Session */}
               <div style={{ display: activeTab === 'Session' ? 'flex' : 'none', flexDirection: 'column', height: '100%' }}>
-                <SessionTab root={root} scale={scale} bpm={bpm} onChordChange={setChordHighlights} />
+                <SessionTab root={root} scale={scale} bpm={bpm} onChordChange={setChordHighlights}
+                  micArmed={micState.armed} micInputNote={micState.inputNote} micTargetNote={micState.targetNote}
+                  autotuneStrength={autotuneStrength} setAutotuneStrength={setAutotuneStrength}
+                  bypass={bypass} setBypass={setBypass} />
               </div>
 
               {/* Browse */}
@@ -923,5 +1058,6 @@ export default function App() {
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
+    </>
   )
 }

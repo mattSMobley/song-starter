@@ -1,5 +1,6 @@
 import * as Tone from 'tone'
 import { sendNoteOn, sendNoteOff } from './midiOut.js'
+import { DRUM_KITS, buildUrlMap } from './drumKits.js'
 
 // Module-level ref keeps the iOS unlock Audio element from being GC'd
 // before play() resolves — GC causes "The operation was aborted" error.
@@ -337,60 +338,80 @@ const INSTRUMENT_PRESETS = {
 }
 
 // ── Drum kit (lazy — initialized with the rest of the audio graph) ────────────
-let drumKick, drumSnare, drumHihatC, drumHihatO, drumCrash
+// ── Sample-based drum engine ───────────────────────────────────────────────────
+let _drumPlayers = null          // Tone.Players instance (null until loaded)
+let _drumKitId   = 'dead-disco'  // currently loaded kit
+const _rrIdx     = {}            // round-robin counters per hit type
+
+// Call this whenever a new kit needs to be loaded (or on first init)
+export async function loadDrumKit(kitId = 'dead-disco') {
+  if (!masterOut) return
+  _drumKitId = kitId
+  const existing = _drumPlayers
+  return new Promise(resolve => {
+    const players = new Tone.Players(buildUrlMap(kitId), () => {
+      players.connect(masterOut)
+      // Small room reverb for snare/crash only — kick and hats are dry
+      if (!isIOS) {
+        const rev = new Tone.Reverb({ decay: 0.6, wet: 1 })
+        rev.connect(masterOut)
+        const send = new Tone.Gain(0.06)
+        send.connect(rev)
+        ;['snare', 'crash'].forEach(t => {
+          Object.keys(buildUrlMap(kitId))
+            .filter(k => k.startsWith(t + '__'))
+            .forEach(k => players.player(k).connect(send))
+        })
+      }
+      _drumPlayers = players
+      existing?.dispose()
+      resolve()
+    })
+  })
+}
 
 function initDrums() {
-  // Same iOS reasoning as main reverb — skip OfflineAudioContext on iOS
-  let drumReverbSend = null
-  if (!isIOS) {
-    const drumReverb = new Tone.Reverb({ decay: 1.2, wet: 1.0 })
-    drumReverb.connect(masterOut)
-    drumReverbSend = new Tone.Gain(0.12)
-    drumReverbSend.connect(drumReverb)
-  }
-
-  const connectDrum = (synth) => {
-    synth.connect(masterOut)
-    if (drumReverbSend) synth.connect(drumReverbSend)
-    return synth
-  }
-
-  drumKick = connectDrum(new Tone.MembraneSynth({
-    pitchDecay: 0.05, octaves: 7,
-    envelope: { attack: 0.001, decay: 0.35, sustain: 0, release: 0.1 },
-    volume: -2,
-  }))
-  drumSnare = connectDrum(new Tone.NoiseSynth({
-    noise: { type: 'white' },
-    envelope: { attack: 0.001, decay: 0.16, sustain: 0, release: 0.05 },
-    volume: -6,
-  }))
-  drumHihatC = connectDrum(new Tone.MetalSynth({
-    frequency: 400, harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5,
-    envelope: { attack: 0.001, decay: 0.07, release: 0.01 },
-    volume: -14,
-  }))
-  drumHihatO = connectDrum(new Tone.MetalSynth({
-    frequency: 400, harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5,
-    envelope: { attack: 0.001, decay: 0.28, release: 0.08 },
-    volume: -16,
-  }))
-  drumCrash = connectDrum(new Tone.MetalSynth({
-    frequency: 300, harmonicity: 5.1, modulationIndex: 64, resonance: 4000, octaves: 3,
-    envelope: { attack: 0.001, decay: 1.2, release: 0.4 },
-    volume: -16,
-  }))
+  loadDrumKit('dead-disco')
 }
 
 export function playDrumHit(type, time) {
-  if (!drumKick) return
+  if (!_drumPlayers) return
   try {
-    const t = time ?? Tone.now()
-    if (type === 'kick')            drumKick.triggerAttackRelease('C1', '8n', t)
-    else if (type === 'snare')      drumSnare.triggerAttackRelease('8n', t)
-    else if (type === 'hihat')      drumHihatC.triggerAttackRelease('8n', t)
-    else if (type === 'hihat_open') drumHihatO.triggerAttackRelease('8n', t)
-    else if (type === 'crash')      drumCrash.triggerAttackRelease('8n', t)
+    const now = Tone.now()
+    const base = time ?? now
+    const jitter = time != null
+      ? (type === 'hihat' || type === 'hihat_open'
+          ? (Math.random() - 0.5) * 0.013
+          : (Math.random() - 0.5) * 0.005)
+      : 0
+    const t = Math.max(now, base + jitter)
+
+    const kit = DRUM_KITS[_drumKitId]
+    if (!kit?.[type]) return
+
+    const layers = kit[type]
+    let layer
+    if (type === 'kick') {
+      const r = Math.random()
+      layer = r < 0.25 ? 'soft' : r < 0.72 ? 'mid' : 'hard'
+    } else if (type === 'snare') {
+      const r = Math.random()
+      layer = r < 0.2 ? 'soft' : r < 0.68 ? 'mid' : 'hard'
+    } else if (type === 'tom-hi' || type === 'tom-lo') {
+      layer = Math.random() < 0.5 ? 'mid' : 'hard'
+    } else {
+      layer = 'rr'
+    }
+
+    const files = layers[layer] ?? layers.rr ?? layers.hard ?? layers.mid ?? layers.soft
+    if (!files?.length) return
+
+    const rrKey = `${_drumKitId}__${type}__${layer}`
+    _rrIdx[rrKey] = ((_rrIdx[rrKey] ?? -1) + 1) % files.length
+    const fileKey = `${type}__${layer}__${_rrIdx[rrKey]}`
+
+    const player = _drumPlayers.player(fileKey)
+    if (player) player.start(t)
   } catch (e) {}
 }
 
@@ -726,9 +747,7 @@ export function setMetronome(active) {
   _metroLoop = new Tone.Loop((time) => {
     // Accent beat 1 of each bar with a slightly louder, pitched click
     const isDownbeat = beat % 4 === 0
-    if (drumHihatC) {
-      drumHihatC.triggerAttackRelease(isDownbeat ? '16n' : '32n', time)
-    }
+    playDrumHit(isDownbeat ? 'hihat_open' : 'hihat', time)
     beat++
   }, '4n')
 

@@ -2,89 +2,42 @@ import { useState, useRef, useEffect } from 'react'
 import * as Tone from 'tone'
 import { DRUM_LOOPS } from '../audio/loopLibrary.js'
 import { getProgressions } from '../audio/chordProgressions.js'
-import { snapToScale } from '../audio/scales.js'
-import { playDrumHit, playNoteAt } from '../audio/engine.js'
-
-// ── Autocorrelation pitch detector ────────────────────────────────────────────
-function detectPitch(buf, sampleRate) {
-  let rms = 0
-  for (let i = 0; i < buf.length; i++) rms += buf[i] * buf[i]
-  if (Math.sqrt(rms / buf.length) < 0.012) return null
-  const half = Math.floor(buf.length / 2)
-  const c = new Float32Array(half)
-  for (let i = 0; i < half; i++)
-    for (let j = 0; j < half; j++) c[i] += buf[j] * buf[j + i]
-  let d = 0
-  while (d < half - 1 && c[d] > c[d + 1]) d++
-  let best = d, bestVal = -Infinity
-  for (let i = d; i < half; i++) if (c[i] > bestVal) { bestVal = c[i]; best = i }
-  if (best <= 0 || best >= half - 1) return null
-  const y1 = c[best - 1], y2 = c[best], y3 = c[best + 1]
-  const x = best + (y3 - y1) / (2 * (2 * y2 - y1 - y3))
-  const freq = sampleRate / x
-  return freq > 60 && freq < 1300 ? freq : null
-}
-
-function noteNameToMidi(name) {
-  const N = { C:0,'C#':1,D:2,'D#':3,E:4,F:5,'F#':6,G:7,'G#':8,A:9,'A#':10,B:11 }
-  const m = name.match(/^([A-G]#?)(-?\d+)$/)
-  return m ? (parseInt(m[2]) + 1) * 12 + (N[m[1]] ?? 0) : 60
-}
-
-function freqToNoteName(freq) {
-  if (!freq || freq < 20) return '—'
-  const NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B']
-  const midi = Math.round(69 + 12 * Math.log2(freq / 440))
-  return NAMES[((midi % 12) + 12) % 12] + (Math.floor(midi / 12) - 1)
-}
+import { playDrumHit, playNoteAt, loadDrumKit } from '../audio/engine.js'
+import { LOOP_KITS } from '../audio/drumKits.js'
 
 // ── Drum grid ─────────────────────────────────────────────────────────────────
-const GRID_ROWS   = ['kick', 'snare', 'hihat']
-const ROW_LABELS  = { kick: 'Kick', snare: 'Snare', hihat: 'Hat' }
-const ROW_COLORS  = { kick: '#a855f7', snare: '#06b6d4', hihat: '#ec4899' }
-const STEPS       = 16
+const GRID_ROWS   = ['kick', 'snare', 'hihat', 'tom-hi', 'tom-lo']
+const ROW_LABELS  = { kick: 'Kick', snare: 'Snare', hihat: 'Hat', 'tom-hi': 'T.Hi', 'tom-lo': 'T.Lo' }
+const ROW_COLORS  = { kick: '#a855f7', snare: '#06b6d4', hihat: '#ec4899', 'tom-hi': '#f59e0b', 'tom-lo': '#10b981' }
+const STEPS       = 32  // 2 bars × 4 beats × 4 steps/beat at 16th-note resolution
 
 function hitsToGrid(hits) {
   const g = {}
   GRID_ROWS.forEach(r => { g[r] = new Array(STEPS).fill(false) })
   hits.forEach(h => {
-    const step = Math.round(h.beat * 2) % STEPS
+    const step = Math.round(h.beat * 4) % STEPS
     const row  = h.type === 'hihat_open' ? 'hihat' : h.type
     if (GRID_ROWS.includes(row)) g[row][step] = true
   })
   return g
 }
 
-export default function SessionTab({ root, scale, bpm, onChordChange }) {
+export default function SessionTab({ root, scale, bpm, onChordChange,
+  micArmed, micInputNote, micTargetNote,
+  autotuneStrength, setAutotuneStrength, bypass, setBypass }) {
   const [drumIdx, setDrumIdx]             = useState(0)
   const [drumGrid, setDrumGrid]           = useState(() => hitsToGrid(DRUM_LOOPS[0].hits))
+  useEffect(() => { loadDrumKit(LOOP_KITS[DRUM_LOOPS[0].id] ?? 'dead-disco') }, [])
   const [currentStep, setCurrentStep]     = useState(-1)
   const [progIdx, setProgIdx]             = useState(0)
-  const [beatsPerChord, setBeatsPerChord] = useState(2)
+  const [beatsPerChord, setBeatsPerChord] = useState(4)
   const [activeChord, setActiveChord]     = useState(-1)
   const [isPlaying, setIsPlaying]         = useState(false)
-  const [micArmed, setMicArmed]           = useState(false)
-  const [micAllowed, setMicAllowed]       = useState(true)
-  const [autotuneStrength, setAutotuneStrength] = useState(80)
-  const [bypass, setBypass]               = useState(false)
-  const [inputNote, setInputNote]         = useState('—')
-  const [targetNote, setTargetNote]       = useState('—')
 
   const drumSeqRef   = useRef(null)
   const chordPartRef = useRef(null)
-  const umRef        = useRef(null)
-  const psRef        = useRef(null)
-  const paRef        = useRef(null)
-  const rafRef       = useRef(null)
   const drumGridRef  = useRef(drumGrid)
 
-  const rootRef      = useRef(root)
-  const scaleRef     = useRef(scale)
-  const strengthRef  = useRef(autotuneStrength)
-  const bypassRef    = useRef(bypass)
-  useEffect(() => { rootRef.current = root;   scaleRef.current = scale }, [root, scale])
-  useEffect(() => { strengthRef.current = autotuneStrength }, [autotuneStrength])
-  useEffect(() => { bypassRef.current   = bypass }, [bypass])
   useEffect(() => { drumGridRef.current = drumGrid }, [drumGrid])
 
   const progressions = getProgressions(root, scale)
@@ -105,15 +58,17 @@ export default function SessionTab({ root, scale, bpm, onChordChange }) {
     await Tone.start()
     stopSession()
 
-    const prog        = progressions[Math.min(progIdx, progressions.length - 1)]
-    const spb         = 60 / bpm
-    const chordSec    = beatsPerChord * spb
-    const chordDur    = chordSec * 0.85
-    const totalChordSec = prog.chords.length * chordSec
+    const prog = progressions[Math.min(progIdx, progressions.length - 1)]
+    const spb  = 60 / bpm
+    // Per-chord beat durations: use the progression's built-in rhythm if defined,
+    // otherwise every chord plays for `beatsPerChord` beats.
+    const chordBeats = prog.beats
+      ? prog.beats.map(b => b * beatsPerChord)
+      : prog.chords.map(() => beatsPerChord)
 
     Tone.getTransport().bpm.value = bpm
 
-    // Drum sequencer (16-step)
+    // Drum sequencer (32-step = 2 bars at 16th-note resolution)
     const seq = new Tone.Sequence((time, step) => {
       GRID_ROWS.forEach(row => {
         if (drumGridRef.current[row][step]) playDrumHit(row, time)
@@ -124,16 +79,24 @@ export default function SessionTab({ root, scale, bpm, onChordChange }) {
     seq.start(0)
     drumSeqRef.current = seq
 
-    // Chord part
+    // Build chord events with variable per-chord timing
+    let tSec = 0
+    const chordEvents = prog.chords.map((chord, i) => {
+      const ev = { time: tSec, chord, chordIdx: i, dur: chordBeats[i] * spb * 0.85 }
+      tSec += chordBeats[i] * spb
+      return ev
+    })
+    const totalChordSec = tSec
+
     const chordPart = new Tone.Part(
       (time, ev) => {
-        ev.chord.notes.forEach(n => playNoteAt(n, chordDur, time))
+        ev.chord.notes.forEach(n => playNoteAt(n, ev.dur, time))
         Tone.getDraw().schedule(() => {
           setActiveChord(ev.chordIdx)
           onChordChange?.(ev.chord.notes)
         }, time)
       },
-      prog.chords.map((chord, i) => ({ time: i * chordSec, chord, chordIdx: i }))
+      chordEvents
     )
     chordPart.loop    = true
     chordPart.loopEnd = totalChordSec
@@ -149,74 +112,17 @@ export default function SessionTab({ root, scale, bpm, onChordChange }) {
     else startSession()
   }
 
-  // Don't stop session on unmount (allows session to persist across tab switches)
-  useEffect(() => () => { teardownMic() }, [])
-
   // Restart chords when root/scale changes while playing
   useEffect(() => {
     if (isPlaying) startSession()
-  }, [root, scale])
+  }, [root, scale, progIdx, beatsPerChord])
 
   // Swap drum pattern when selector changes (without restarting everything)
   function selectDrum(idx) {
     setDrumIdx(idx)
     setDrumGrid(hitsToGrid(DRUM_LOOPS[idx].hits))
-  }
-
-  // ── Mic / Autotune ─────────────────────────────────────────────────────────
-  function teardownMic() {
-    cancelAnimationFrame(rafRef.current)
-    try {
-      if (umRef.current) { umRef.current.close(); umRef.current.dispose(); umRef.current = null }
-      if (psRef.current) { psRef.current.disconnect(); psRef.current.dispose(); psRef.current = null }
-      if (paRef.current) { paRef.current.disconnect(); paRef.current.dispose(); paRef.current = null }
-    } catch {}
-  }
-
-  async function armMic() {
-    try {
-      await Tone.start()
-      const um = new Tone.UserMedia()
-      await um.open()
-      const ps = new Tone.PitchShift({ pitch: 0, windowSize: 0.1 }).toDestination()
-      const pa = new Tone.Analyser('waveform', 2048)
-      um.connect(ps)
-      um.connect(pa)
-      umRef.current = um; psRef.current = ps; paRef.current = pa
-      setMicArmed(true)
-      startPitchLoop()
-    } catch { setMicAllowed(false) }
-  }
-
-  function disarmMic() {
-    setMicArmed(false)
-    setInputNote('—')
-    setTargetNote('—')
-    teardownMic()
-  }
-
-  function startPitchLoop() {
-    let smoothShift = 0
-    function tick() {
-      rafRef.current = requestAnimationFrame(tick)
-      if (!paRef.current || !psRef.current) return
-      const freq = detectPitch(paRef.current.getValue(), Tone.context.sampleRate)
-      if (freq) {
-        const inputMidi   = 69 + 12 * Math.log2(freq / 440)
-        const snapped     = snapToScale(Math.round(inputMidi), rootRef.current, scaleRef.current)
-        const snappedMidi = noteNameToMidi(snapped)
-        const rawShift    = snappedMidi - inputMidi
-        const targetShift = bypassRef.current ? 0 : rawShift * (strengthRef.current / 100)
-        smoothShift       = smoothShift * 0.7 + targetShift * 0.3
-        psRef.current.pitch = smoothShift
-        setInputNote(freqToNoteName(freq))
-        setTargetNote(bypassRef.current ? '—' : snapped)
-      } else {
-        smoothShift = smoothShift * 0.85
-        psRef.current.pitch = smoothShift
-      }
-    }
-    tick()
+    const kit = LOOP_KITS[DRUM_LOOPS[idx].id] ?? 'dead-disco'
+    loadDrumKit(kit)
   }
 
   // ── Styles ─────────────────────────────────────────────────────────────────
@@ -250,10 +156,11 @@ export default function SessionTab({ root, scale, bpm, onChordChange }) {
   const prog = progressions[Math.min(progIdx, progressions.length - 1)]
 
   return (
-    <div className="flex flex-col h-full gap-4">
+    <div className="overflow-y-auto h-full" style={{ WebkitOverflowScrolling: 'touch' }}>
+    <div className="flex flex-col gap-4" style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}>
 
       {/* ── Header ── */}
-      <div className="flex items-center justify-between flex-shrink-0">
+      <div className="flex items-center justify-between">
         <div>
           <h2 className="font-bold" style={{ color: '#e2e8f0', fontSize: '0.9rem', letterSpacing: '-0.01em' }}>
             Session
@@ -282,9 +189,6 @@ export default function SessionTab({ root, scale, bpm, onChordChange }) {
         </button>
       </div>
 
-      {/* ── Scrollable body ── */}
-      <div className="flex-1 overflow-y-auto min-h-0" style={{ WebkitOverflowScrolling: 'touch' }}>
-        <div className="flex flex-col gap-4" style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}>
 
         {/* ── Beat ── */}
         <div style={card}>
@@ -305,45 +209,45 @@ export default function SessionTab({ root, scale, bpm, onChordChange }) {
             ))}
           </div>
 
-          {/* Editable 16-step drum grid */}
+          {/* 32-step drum grid — displayed as 2 rows of 16 (bar 1 / bar 2) */}
           <div style={{ background: 'rgba(6,6,12,0.55)', borderRadius: 10, padding: '10px 12px', border: '1px solid rgba(46,46,74,0.4)', marginTop: 10 }}>
-            {/* Playhead */}
-            <div className="flex gap-px mb-1.5" style={{ paddingLeft: 38 }}>
-              {Array.from({ length: STEPS }).map((_, s) => (
-                <div key={s} className="flex-1" style={{
-                  height: 3, borderRadius: 2,
-                  background: isPlaying && s === currentStep ? 'rgba(192,132,252,0.9)' : 'transparent',
-                  boxShadow: isPlaying && s === currentStep ? '0 0 6px rgba(192,132,252,0.8)' : 'none',
-                  transition: 'background 0.04s',
-                }} />
-              ))}
-            </div>
             {GRID_ROWS.map(row => (
-              <div key={row} className="flex items-center gap-1.5 mb-1">
-                <span style={{ width: 32, fontSize: '0.55rem', fontWeight: 700, color: ROW_COLORS[row], letterSpacing: '0.08em', flexShrink: 0 }}>
-                  {ROW_LABELS[row]}
-                </span>
-                <div className="flex gap-px flex-1">
-                  {drumGrid[row].map((on, s) => (
-                    <button
-                      key={s}
-                      onClick={() => setDrumGrid(g => ({ ...g, [row]: g[row].map((v, i) => i === s ? !v : v) }))}
-                      className="flex-1 rounded-sm transition-all"
-                      style={{
-                        height: 16,
-                        background: on
-                          ? ROW_COLORS[row]
-                          : isPlaying && s === currentStep ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.04)',
-                        boxShadow: on ? `0 0 5px ${ROW_COLORS[row]}80` : 'none',
-                        border: s % 4 === 0
-                          ? `1px solid ${on ? ROW_COLORS[row] + '80' : 'rgba(124,58,237,0.2)'}`
-                          : `1px solid ${on ? ROW_COLORS[row] + '60' : 'rgba(255,255,255,0.04)'}`,
-                        opacity: on ? 1 : 0.45,
-                        cursor: 'pointer', padding: 0,
-                      }}
-                    />
-                  ))}
-                </div>
+              <div key={row} className="mb-1.5">
+                {[0, 16].map(barOffset => (
+                  <div key={barOffset} className="flex items-center gap-1 mb-px">
+                    <span style={{ width: 32, fontSize: '0.52rem', fontWeight: 700, color: barOffset === 0 ? ROW_COLORS[row] : 'transparent', letterSpacing: '0.08em', flexShrink: 0 }}>
+                      {ROW_LABELS[row]}
+                    </span>
+                    {/* Bar label */}
+                    <span style={{ width: 14, fontSize: '0.42rem', color: 'rgba(148,163,184,0.25)', flexShrink: 0, textAlign: 'center' }}>
+                      {barOffset === 0 ? 'B1' : 'B2'}
+                    </span>
+                    <div className="flex gap-px flex-1">
+                      {Array.from({ length: 16 }).map((_, i) => {
+                        const s = barOffset + i
+                        const on = drumGrid[row][s]
+                        const active = isPlaying && s === currentStep
+                        return (
+                          <button
+                            key={s}
+                            onClick={() => setDrumGrid(g => ({ ...g, [row]: g[row].map((v, idx) => idx === s ? !v : v) }))}
+                            className="flex-1 rounded-sm transition-all"
+                            style={{
+                              height: 14,
+                              background: on ? ROW_COLORS[row] : active ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.04)',
+                              boxShadow: on ? `0 0 4px ${ROW_COLORS[row]}80` : 'none',
+                              border: i % 4 === 0
+                                ? `1px solid ${on ? ROW_COLORS[row] + '80' : 'rgba(124,58,237,0.22)'}`
+                                : `1px solid ${on ? ROW_COLORS[row] + '60' : 'rgba(255,255,255,0.04)'}`,
+                              opacity: on ? 1 : 0.45,
+                              cursor: 'pointer', padding: 0,
+                            }}
+                          />
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))}
               </div>
             ))}
           </div>
@@ -383,21 +287,30 @@ export default function SessionTab({ root, scale, bpm, onChordChange }) {
               <span style={{ fontSize: '0.6rem', color: 'rgba(148,163,184,0.35)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
                 {prog.tag}
               </span>
-              <div className="flex gap-1.5 flex-wrap">
+              <div className="flex gap-1.5 flex-wrap items-end">
                 {prog.chords.map((c, i) => {
                   const isActive = isPlaying && activeChord === i
+                  const beatCount = prog.beats ? prog.beats[i] * beatsPerChord : beatsPerChord
                   return (
-                    <span key={i} style={{
-                      padding: '5px 12px', borderRadius: 8,
-                      background: isActive ? 'rgba(6,182,212,0.25)' : 'rgba(6,182,212,0.1)',
-                      border: isActive ? '1px solid rgba(6,182,212,0.6)' : '1px solid rgba(6,182,212,0.25)',
-                      fontSize: '0.8rem', fontWeight: 800, fontFamily: 'monospace', color: isActive ? '#22d3ee' : '#67e8f9',
-                      transition: 'all 0.1s ease',
-                      transform: isActive ? 'scale(1.06)' : 'scale(1)',
-                      boxShadow: isActive ? '0 0 12px rgba(6,182,212,0.4)' : 'none',
-                    }}>
-                      {c.label}
-                    </span>
+                    <div key={i} className="flex flex-col items-center gap-0.5">
+                      <span style={{
+                        padding: '5px 12px', borderRadius: 8,
+                        background: isActive ? 'rgba(6,182,212,0.25)' : 'rgba(6,182,212,0.1)',
+                        border: isActive ? '1px solid rgba(6,182,212,0.6)' : '1px solid rgba(6,182,212,0.25)',
+                        fontSize: '0.8rem', fontWeight: 800, fontFamily: 'monospace', color: isActive ? '#22d3ee' : '#67e8f9',
+                        transition: 'all 0.1s ease',
+                        transform: isActive ? 'scale(1.06)' : 'scale(1)',
+                        boxShadow: isActive ? '0 0 12px rgba(6,182,212,0.4)' : 'none',
+                        display: 'block',
+                      }}>
+                        {c.label}
+                      </span>
+                      {prog.beats && (
+                        <span style={{ fontSize: '0.5rem', fontWeight: 700, color: isActive ? 'rgba(34,211,238,0.7)' : 'rgba(34,211,238,0.35)', letterSpacing: '0.06em' }}>
+                          {beatCount}b
+                        </span>
+                      )}
+                    </div>
                   )
                 })}
               </div>
@@ -409,107 +322,50 @@ export default function SessionTab({ root, scale, bpm, onChordChange }) {
         <div style={{
           ...card,
           border: micArmed ? '1px solid rgba(236,72,153,0.45)' : '1px solid rgba(46,46,74,0.5)',
-          boxShadow: micArmed ? '0 0 24px rgba(236,72,153,0.12), inset 0 1px 0 rgba(255,255,255,0.04)' : 'none',
+          boxShadow: micArmed ? '0 0 24px rgba(236,72,153,0.12)' : 'none',
         }}>
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <span style={sectionLabel}>Vocal + Autotune</span>
-              {micArmed && (
-                <span className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                  style={{ background: '#ec4899', boxShadow: '0 0 6px #ec4899', animation: 'pulse 1s ease-in-out infinite' }} />
-              )}
-            </div>
-            <button
-              onClick={micArmed ? disarmMic : armMic}
-              disabled={!micAllowed}
-              className="flex items-center gap-2 rounded-xl font-bold transition-all"
-              style={{
-                padding: '8px 18px', fontSize: '0.75rem',
-                background: micArmed ? 'linear-gradient(135deg, rgba(236,72,153,0.45), rgba(219,39,119,0.25))' : 'rgba(255,255,255,0.04)',
-                border: micArmed ? '1px solid rgba(236,72,153,0.55)' : '1px solid rgba(255,255,255,0.1)',
-                color: micArmed ? '#fbcfe8' : 'rgba(148,163,184,0.6)',
-                cursor: micAllowed ? 'pointer' : 'not-allowed',
-                opacity: micAllowed ? 1 : 0.4,
-              }}>
-              🎤 {micArmed ? 'Disarm Mic' : 'Arm Mic'}
-            </button>
+          <div className="flex items-center gap-2 mb-3">
+            <span style={sectionLabel}>Vocal + Autotune</span>
+            {micArmed && (
+              <span className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                style={{ background: '#ec4899', boxShadow: '0 0 6px #ec4899', animation: 'pulse 1s ease-in-out infinite' }} />
+            )}
           </div>
 
-          {!micAllowed && (
-            <div className="rounded-xl" style={{ padding: '10px 14px', background: 'rgba(236,72,153,0.08)', border: '1px solid rgba(236,72,153,0.25)' }}>
-              <p style={{ fontSize: '0.72rem', color: 'rgba(236,72,153,0.8)' }}>
-                Mic access was denied. Enable microphone permission in your browser settings and reload.
-              </p>
-            </div>
-          )}
-
-          {micAllowed && !micArmed && (
-            <p style={{ fontSize: '0.72rem', color: 'rgba(148,163,184,0.3)' }}>
-              Arm the mic to sing with real-time autotune over your session. Use headphones to prevent feedback.
+          {!micArmed ? (
+            <p style={{ fontSize: '0.72rem', color: 'rgba(148,163,184,0.35)' }}>
+              Tap the mic button in the keyboard area to arm autotune, then sing.
             </p>
-          )}
-
-          {micArmed && (
-            <div className="flex flex-col gap-4">
-              <div className="flex items-center gap-2 rounded-lg" style={{ padding: '7px 12px', background: 'rgba(255,200,0,0.07)', border: '1px solid rgba(255,200,0,0.2)' }}>
-                <span style={{ fontSize: 14 }}>🎧</span>
-                <span style={{ fontSize: '0.67rem', color: 'rgba(253,224,71,0.7)' }}>Use headphones — speakers will cause feedback</span>
-              </div>
-
-              <div className="flex items-center gap-6 rounded-xl" style={{ padding: '14px 18px', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(236,72,153,0.2)' }}>
-                <div className="flex flex-col items-center gap-1">
-                  <span style={{ fontSize: '0.55rem', letterSpacing: '0.14em', color: 'rgba(148,163,184,0.4)', textTransform: 'uppercase' }}>Singing</span>
-                  <span style={{ fontSize: '1.8rem', fontWeight: 800, fontFamily: 'monospace', color: '#f9a8d4', lineHeight: 1, letterSpacing: '-0.03em' }}>
-                    {inputNote}
-                  </span>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {/* Note display */}
+              <div className="flex items-center gap-4 rounded-xl px-4 py-3"
+                style={{ background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(236,72,153,0.2)' }}>
+                <div className="flex flex-col items-center">
+                  <span style={{ fontSize: '0.55rem', letterSpacing: '0.1em', color: 'rgba(148,163,184,0.4)', textTransform: 'uppercase' }}>Singing</span>
+                  <span style={{ fontSize: '1.8rem', fontWeight: 800, fontFamily: 'monospace', color: '#f9a8d4', lineHeight: 1 }}>{micInputNote}</span>
                 </div>
-                <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, rgba(249,168,212,0.4), rgba(192,132,252,0.4))' }} />
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(192,132,252,0.5)" strokeWidth="2">
-                  <polyline points="9,18 15,12 9,6"/>
-                </svg>
-                <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, rgba(192,132,252,0.4), rgba(168,85,247,0.4))' }} />
-                <div className="flex flex-col items-center gap-1">
-                  <span style={{ fontSize: '0.55rem', letterSpacing: '0.14em', color: 'rgba(148,163,184,0.4)', textTransform: 'uppercase' }}>Tuned</span>
-                  <span style={{ fontSize: '1.8rem', fontWeight: 800, fontFamily: 'monospace', color: '#c084fc', lineHeight: 1, letterSpacing: '-0.03em' }}>
-                    {targetNote}
-                  </span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(192,132,252,0.5)" strokeWidth="2"><polyline points="9,18 15,12 9,6"/></svg>
+                <div className="flex flex-col items-center">
+                  <span style={{ fontSize: '0.55rem', letterSpacing: '0.1em', color: 'rgba(148,163,184,0.4)', textTransform: 'uppercase' }}>Tuned</span>
+                  <span style={{ fontSize: '1.8rem', fontWeight: 800, fontFamily: 'monospace', color: '#c084fc', lineHeight: 1 }}>{micTargetNote}</span>
                 </div>
               </div>
-
+              {/* Strength */}
               <div className="flex items-center gap-3">
-                <span style={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.12em', color: 'rgba(192,132,252,0.65)', textTransform: 'uppercase', flexShrink: 0, width: 60 }}>
+                <span style={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.12em', color: 'rgba(192,132,252,0.65)', textTransform: 'uppercase', flexShrink: 0 }}>
                   Strength
                 </span>
-                <input
-                  type="range" min={0} max={100} value={autotuneStrength}
+                <input type="range" min={0} max={100} value={autotuneStrength}
                   onChange={e => setAutotuneStrength(Number(e.target.value))}
-                  className="flex-1"
-                  style={{ accentColor: '#a855f7', cursor: 'pointer' }}
-                />
-                <div className="flex items-baseline gap-1 flex-shrink-0" style={{ width: 72, justifyContent: 'flex-end' }}>
-                  <span style={{ fontSize: '1.1rem', fontWeight: 800, fontFamily: 'monospace', color: '#c084fc' }}>
-                    {autotuneStrength}
-                  </span>
-                  <span style={{ fontSize: '0.65rem', color: 'rgba(192,132,252,0.5)' }}>%</span>
-                </div>
+                  className="flex-1" style={{ accentColor: '#a855f7', cursor: 'pointer' }} />
+                <span style={{ fontSize: '0.88rem', fontWeight: 800, fontFamily: 'monospace', color: '#c084fc', flexShrink: 0, width: 36, textAlign: 'right' }}>{autotuneStrength}</span>
               </div>
-
-              <div className="flex items-center justify-between">
-                <span style={{ fontSize: '0.62rem', color: 'rgba(148,163,184,0.35)' }}>
-                  {autotuneStrength < 35 ? 'natural — barely noticeable'
-                    : autotuneStrength < 65 ? 'moderate — pitch polish'
-                    : autotuneStrength < 90 ? 'strong — obvious correction'
-                    : 'hard snap — T-Pain mode'}
-                </span>
-                <button
-                  onClick={() => setBypass(b => !b)}
-                  style={{ ...pill(bypass, 'pink'), padding: '5px 14px', fontSize: '0.65rem' }}>
-                  {bypass ? 'Bypass: ON' : 'Bypass: OFF'}
-                </button>
-              </div>
+              <span style={{ fontSize: '0.62rem', color: 'rgba(148,163,184,0.35)' }}>
+                {autotuneStrength < 35 ? 'natural' : autotuneStrength < 65 ? 'moderate' : autotuneStrength < 90 ? 'strong' : 'T-Pain'}
+              </span>
             </div>
           )}
-        </div>
         </div>
       </div>
     </div>
