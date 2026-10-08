@@ -337,34 +337,62 @@ const INSTRUMENT_PRESETS = {
   ],
 }
 
-// ── Drum kit (lazy — initialized with the rest of the audio graph) ────────────
 // ── Sample-based drum engine ───────────────────────────────────────────────────
-let _drumPlayers = null          // Tone.Players instance (null until loaded)
-let _drumKitId   = 'dead-disco'  // currently loaded kit
-const _rrIdx     = {}            // round-robin counters per hit type
+// Raw AudioBuffer map — each hit creates a new AudioBufferSourceNode for true
+// polyphonic playback. Tone.Players is used only to load/decode the files;
+// it is disposed after extraction so the Player state machine never blocks hits.
+let _drumBuffers  = null   // Map<fileKey, AudioBuffer>
+let _drumDryDest  = null   // native GainNode (masterOut.input)
+let _drumRevSend  = null   // native GainNode for snare/crash reverb (null on iOS)
+let _drumRevKeys  = new Set()
+let _drumRevTone  = null   // Tone.Reverb kept for disposal on kit switch
+let _drumSendTone = null   // Tone.Gain send kept for disposal on kit switch
+let _drumKitId    = 'dead-disco'
+const _rrIdx      = {}
 
-// Call this whenever a new kit needs to be loaded (or on first init)
 export async function loadDrumKit(kitId = 'dead-disco') {
   if (!masterOut) return
   _drumKitId = kitId
-  const existing = _drumPlayers
   return new Promise(resolve => {
-    const players = new Tone.Players(buildUrlMap(kitId), () => {
-      players.connect(masterOut)
-      // Small room reverb for snare/crash only — kick and hats are dry
+    const urlMap = buildUrlMap(kitId)
+    const players = new Tone.Players(urlMap, () => {
+      // Extract raw AudioBuffers before disposing the Tone.Players wrapper
+      const buffers = new Map()
+      for (const key of Object.keys(urlMap)) {
+        try {
+          const buf = players.player(key).buffer.get()
+          if (buf) buffers.set(key, buf)
+        } catch (e) {}
+      }
+
+      // Dispose previous reverb/send nodes on kit switch
+      _drumRevTone?.dispose()
+      _drumSendTone?.dispose()
+      _drumRevTone = null
+      _drumSendTone = null
+
+      // Dry destination — masterOut.input is the native GainNode inside Tone.Gain
+      _drumDryDest = masterOut.input
+      _drumRevSend = null
+      _drumRevKeys.clear()
+
+      // Small room reverb for snare/crash only (non-iOS)
       if (!isIOS) {
         const rev = new Tone.Reverb({ decay: 0.6, wet: 1 })
         rev.connect(masterOut)
         const send = new Tone.Gain(0.06)
         send.connect(rev)
-        ;['snare', 'crash'].forEach(t => {
-          Object.keys(buildUrlMap(kitId))
-            .filter(k => k.startsWith(t + '__'))
-            .forEach(k => players.player(k).connect(send))
-        })
+        _drumRevTone  = rev
+        _drumSendTone = send
+        _drumRevSend  = send.input   // native GainNode
+        Object.keys(urlMap)
+          .filter(k => k.startsWith('snare__') || k.startsWith('crash__'))
+          .forEach(k => _drumRevKeys.add(k))
       }
-      _drumPlayers = players
-      existing?.dispose()
+
+      _drumBuffers = buffers
+      // Tone.Players is no longer needed; AudioBuffers survive in our Map
+      players.dispose()
       resolve()
     })
   })
@@ -375,16 +403,13 @@ function initDrums() {
 }
 
 export function playDrumHit(type, time) {
-  if (!_drumPlayers) return
+  if (!_drumBuffers || !_drumDryDest) return
   try {
-    const now = Tone.now()
-    const base = time ?? now
-    const jitter = time != null
-      ? (type === 'hihat' || type === 'hihat_open'
-          ? (Math.random() - 0.5) * 0.013
-          : (Math.random() - 0.5) * 0.005)
-      : 0
-    const t = Math.max(now, base + jitter)
+    // Use rawContext.currentTime throughout — Tone.now() adds a 100ms lookahead
+    // offset that would corrupt times scheduled by the raw-clock interval scheduler.
+    const ctx = Tone.getContext().rawContext
+    const now = ctx.currentTime
+    const t = time != null ? Math.max(now, time) : now
 
     const kit = DRUM_KITS[_drumKitId]
     if (!kit?.[type]) return
@@ -410,9 +435,50 @@ export function playDrumHit(type, time) {
     _rrIdx[rrKey] = ((_rrIdx[rrKey] ?? -1) + 1) % files.length
     const fileKey = `${type}__${layer}__${_rrIdx[rrKey]}`
 
-    const player = _drumPlayers.player(fileKey)
-    if (player) player.start(t)
+    const buf = _drumBuffers.get(fileKey)
+    if (!buf) return
+
+    const src = ctx.createBufferSource()
+    src.buffer = buf
+    src.connect(_drumDryDest)
+    if (_drumRevSend && _drumRevKeys.has(fileKey)) src.connect(_drumRevSend)
+    src.start(t)
   } catch (e) {}
+}
+
+// ── Drum loop player ──────────────────────────────────────────────────────────
+let _drumLoopPlayer = null
+
+export function stopDrumLoop() {
+  if (_drumLoopPlayer) {
+    const p = _drumLoopPlayer
+    _drumLoopPlayer = null   // clear first so stale onload guards fire correctly
+    try { p.stop(0) } catch (e) {}
+    try { p.dispose() } catch (e) {}
+  }
+}
+
+export function startDrumLoop(loopFiles, targetBpm) {
+  stopDrumLoop()
+  if (!masterOut) return
+
+  const nearest = loopFiles.reduce((prev, curr) =>
+    Math.abs(curr.bpm - targetBpm) < Math.abs(prev.bpm - targetBpm) ? curr : prev
+  )
+  const rate = targetBpm / nearest.bpm
+
+  const player = new Tone.Player({
+    url: nearest.src,
+    loop: true,
+    onload: () => {
+      // Guard against rapid beat-switching: if we're no longer the current player, bail
+      if (_drumLoopPlayer !== player) { player.dispose(); return }
+      player.playbackRate.value = rate
+      player.connect(masterOut)
+      try { player.start(Tone.now() + 0.05) } catch (e) {}
+    },
+  })
+  _drumLoopPlayer = player   // set immediately so stopDrumLoop can cancel this load
 }
 
 // ── Sampler configs (real instrument samples) ─────────────────────────────────

@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import * as Tone from 'tone'
 import { DRUM_LOOPS } from '../audio/loopLibrary.js'
 import { getProgressions } from '../audio/chordProgressions.js'
-import { playDrumHit, playNoteAt, loadDrumKit } from '../audio/engine.js'
+import { playDrumHit, playNoteAt, loadDrumKit, startDrumLoop, stopDrumLoop } from '../audio/engine.js'
 import { LOOP_KITS } from '../audio/drumKits.js'
 
 // ── Drum grid ─────────────────────────────────────────────────────────────────
@@ -33,77 +33,134 @@ export default function SessionTab({ root, scale, bpm, onChordChange,
   const [beatsPerChord, setBeatsPerChord] = useState(4)
   const [activeChord, setActiveChord]     = useState(-1)
   const [isPlaying, setIsPlaying]         = useState(false)
+  const [chordEnabled, setChordEnabled]   = useState(true)
 
-  const drumSeqRef   = useRef(null)
-  const chordPartRef = useRef(null)
-  const drumGridRef  = useRef(drumGrid)
+  // Interval-based scheduler refs — no Tone.Transport involved
+  const schedRef         = useRef(null)
+  const drumNextTimeRef  = useRef(0)
+  const drumStepRef      = useRef(0)
+  const chordNextTimeRef = useRef(0)
+  const chordIdxRef      = useRef(0)
+  const drumGridRef      = useRef(drumGrid)
+  const chordEnabledRef  = useRef(true)
+  const drumIsLoopRef    = useRef(false)
 
   useEffect(() => { drumGridRef.current = drumGrid }, [drumGrid])
+  useEffect(() => { chordEnabledRef.current = chordEnabled }, [chordEnabled])
+  // Cleanup on unmount — stop both the chord scheduler and any running loop
+  useEffect(() => () => { clearTimeout(schedRef.current); stopDrumLoop() }, [])
 
   const progressions = getProgressions(root, scale)
 
-  // ── Transport ──────────────────────────────────────────────────────────────
+  // ── Scheduler ─────────────────────────────────────────────────────────────
+  // Direct Web Audio clock scheduler — bypasses Tone.js Transport entirely so
+  // there's no Tone.now() lookahead offset or Transport state-machine overhead.
+  // LOOKAHEAD: schedule this far ahead of rawContext.currentTime each tick.
+  // TICK_MS:   how often the scheduler fires (must be < LOOKAHEAD * 1000).
+  const LOOKAHEAD = 0.15   // 150 ms — covers GC pauses
+  const TICK_MS   = 20     // 20 ms ticks
+
+  // Stops only the chord+step scheduler — leaves the drum loop running.
+  // Used when chord settings change so the loop doesn't reset to beat 1.
+  function stopChordScheduler() {
+    clearTimeout(schedRef.current)
+    schedRef.current = null
+  }
+
   function stopSession() {
+    stopChordScheduler()
+    stopDrumLoop()
+    drumIsLoopRef.current = false
     setIsPlaying(false)
     setCurrentStep(-1)
     setActiveChord(-1)
     onChordChange?.([])
-    if (drumSeqRef.current)  { drumSeqRef.current.dispose();  drumSeqRef.current  = null }
-    if (chordPartRef.current) { chordPartRef.current.dispose(); chordPartRef.current = null }
-    Tone.getTransport().stop()
-    Tone.getTransport().position = 0
   }
 
-  async function startSession() {
+  // keepDrums=true: restart only the chord scheduler, let the drum loop/sequencer
+  // continue uninterrupted (used when root/scale/progression changes mid-session).
+  async function startSession(keepDrums = false) {
     await Tone.start()
-    stopSession()
+    stopChordScheduler()
 
+    const ctx  = Tone.getContext().rawContext
     const prog = progressions[Math.min(progIdx, progressions.length - 1)]
     const spb  = 60 / bpm
-    // Per-chord beat durations: use the progression's built-in rhythm if defined,
-    // otherwise every chord plays for `beatsPerChord` beats.
+    const s16  = spb / 4   // 16th-note duration in seconds
+
     const chordBeats = prog.beats
       ? prog.beats.map(b => b * beatsPerChord)
       : prog.chords.map(() => beatsPerChord)
+    const chordEvents = prog.chords.map((chord, i) => ({
+      chord,
+      chordIdx: i,
+      dur:      chordBeats[i] * spb * 0.85,
+      beatDur:  chordBeats[i] * spb,
+    }))
 
-    Tone.getTransport().bpm.value = bpm
+    const startTime = ctx.currentTime + 0.05
+    chordNextTimeRef.current = startTime
+    chordIdxRef.current      = 0
 
-    // Drum sequencer (32-step = 2 bars at 16th-note resolution)
-    const seq = new Tone.Sequence((time, step) => {
-      GRID_ROWS.forEach(row => {
-        if (drumGridRef.current[row][step]) playDrumHit(row, time)
-      })
-      Tone.getDraw().schedule(() => setCurrentStep(step), time)
-    }, Array.from({ length: STEPS }, (_, i) => i), '16n')
-    seq.loop = true
-    seq.start(0)
-    drumSeqRef.current = seq
+    if (!keepDrums) {
+      setCurrentStep(-1)
+      setActiveChord(-1)
+      drumNextTimeRef.current = startTime
+      drumStepRef.current     = 0
+      const loopDef = DRUM_LOOPS[drumIdx]
+      drumIsLoopRef.current = !!loopDef.loopFiles
+      if (loopDef.loopFiles) {
+        startDrumLoop(loopDef.loopFiles, bpm)
+      } else {
+        stopDrumLoop()
+      }
+    }
 
-    // Build chord events with variable per-chord timing
-    let tSec = 0
-    const chordEvents = prog.chords.map((chord, i) => {
-      const ev = { time: tSec, chord, chordIdx: i, dur: chordBeats[i] * spb * 0.85 }
-      tSec += chordBeats[i] * spb
-      return ev
-    })
-    const totalChordSec = tSec
+    function tick() {
+      const now   = ctx.currentTime
+      const ahead = now + LOOKAHEAD
 
-    const chordPart = new Tone.Part(
-      (time, ev) => {
-        ev.chord.notes.forEach(n => playNoteAt(n, ev.dur, time))
-        Tone.getDraw().schedule(() => {
-          setActiveChord(ev.chordIdx)
-          onChordChange?.(ev.chord.notes)
-        }, time)
-      },
-      chordEvents
-    )
-    chordPart.loop    = true
-    chordPart.loopEnd = totalChordSec
-    chordPart.start(0)
-    chordPartRef.current = chordPart
+      // Drums: only schedule hits for sequencer-based beats; loops run independently
+      if (!drumIsLoopRef.current) {
+        while (drumNextTimeRef.current < ahead) {
+          const step = drumStepRef.current
+          const t    = drumNextTimeRef.current
+          GRID_ROWS.forEach(row => {
+            if (drumGridRef.current[row][step]) playDrumHit(row, t)
+          })
+          // Visual step indicator: fire ~at the audio time using a JS delay
+          const msUntil = Math.max(0, (t - now) * 1000)
+          setTimeout(() => setCurrentStep(step), msUntil)
+          drumStepRef.current     = (drumStepRef.current + 1) % STEPS
+          drumNextTimeRef.current += s16
+        }
+      }
 
-    Tone.getTransport().start()
+      // Chords: schedule each chord change within the lookahead window
+      while (chordNextTimeRef.current < ahead) {
+        const idx = chordIdxRef.current
+        const ev  = chordEvents[idx]
+        const t   = chordNextTimeRef.current
+        if (chordEnabledRef.current) {
+          ev.chord.notes.forEach(n => playNoteAt(n, ev.dur, t))
+        }
+        const msUntil = Math.max(0, (t - now) * 1000)
+        setTimeout(() => {
+          if (chordEnabledRef.current) {
+            setActiveChord(ev.chordIdx)
+            onChordChange?.(ev.chord.notes)
+          } else {
+            setActiveChord(-1)
+          }
+        }, msUntil)
+        chordIdxRef.current      = (idx + 1) % chordEvents.length
+        chordNextTimeRef.current += ev.beatDur
+      }
+
+      schedRef.current = setTimeout(tick, TICK_MS)
+    }
+
+    tick()
     setIsPlaying(true)
   }
 
@@ -112,17 +169,36 @@ export default function SessionTab({ root, scale, bpm, onChordChange,
     else startSession()
   }
 
-  // Restart chords when root/scale changes while playing
+  // Chord settings changed — restart only the chord scheduler, leave drums alone
   useEffect(() => {
-    if (isPlaying) startSession()
+    if (isPlaying) startSession(true)
   }, [root, scale, progIdx, beatsPerChord])
+
+  // BPM changed — restart drums (loop playbackRate or sequencer timing both need updating)
+  useEffect(() => {
+    if (isPlaying) startSession(false)
+  }, [bpm])
 
   // Swap drum pattern when selector changes (without restarting everything)
   function selectDrum(idx) {
+    const newLoop = DRUM_LOOPS[idx]
     setDrumIdx(idx)
-    setDrumGrid(hitsToGrid(DRUM_LOOPS[idx].hits))
-    const kit = LOOP_KITS[DRUM_LOOPS[idx].id] ?? 'dead-disco'
+    setDrumGrid(hitsToGrid(newLoop.hits))
+    const kit = LOOP_KITS[newLoop.id] ?? 'dead-disco'
     loadDrumKit(kit)
+
+    if (isPlaying) {
+      if (newLoop.loopFiles) {
+        drumIsLoopRef.current = true
+        startDrumLoop(newLoop.loopFiles, bpm)
+      } else {
+        stopDrumLoop()
+        drumIsLoopRef.current = false
+        const ctx = Tone.getContext().rawContext
+        drumNextTimeRef.current = ctx.currentTime + 0.05
+        drumStepRef.current = 0
+      }
+    }
   }
 
   // ── Styles ─────────────────────────────────────────────────────────────────
@@ -153,7 +229,9 @@ export default function SessionTab({ root, scale, bpm, onChordChange,
     textTransform: 'uppercase', color: 'rgba(192,132,252,0.75)',
   }
 
-  const prog = progressions[Math.min(progIdx, progressions.length - 1)]
+  const prog       = progressions[Math.min(progIdx, progressions.length - 1)]
+  const activeBeat = DRUM_LOOPS[drumIdx]
+  const isLoopBeat = !!activeBeat.loopFiles
 
   return (
     <div className="overflow-y-auto h-full" style={{ WebkitOverflowScrolling: 'touch' }}>
@@ -209,48 +287,68 @@ export default function SessionTab({ root, scale, bpm, onChordChange,
             ))}
           </div>
 
-          {/* 32-step drum grid — displayed as 2 rows of 16 (bar 1 / bar 2) */}
-          <div style={{ background: 'rgba(6,6,12,0.55)', borderRadius: 10, padding: '10px 12px', border: '1px solid rgba(46,46,74,0.4)', marginTop: 10 }}>
-            {GRID_ROWS.map(row => (
-              <div key={row} className="mb-1.5">
-                {[0, 16].map(barOffset => (
-                  <div key={barOffset} className="flex items-center gap-1 mb-px">
-                    <span style={{ width: 32, fontSize: '0.52rem', fontWeight: 700, color: barOffset === 0 ? ROW_COLORS[row] : 'transparent', letterSpacing: '0.08em', flexShrink: 0 }}>
-                      {ROW_LABELS[row]}
-                    </span>
-                    {/* Bar label */}
-                    <span style={{ width: 14, fontSize: '0.42rem', color: 'rgba(148,163,184,0.25)', flexShrink: 0, textAlign: 'center' }}>
-                      {barOffset === 0 ? 'B1' : 'B2'}
-                    </span>
-                    <div className="flex gap-px flex-1">
-                      {Array.from({ length: 16 }).map((_, i) => {
-                        const s = barOffset + i
-                        const on = drumGrid[row][s]
-                        const active = isPlaying && s === currentStep
-                        return (
-                          <button
-                            key={s}
-                            onClick={() => setDrumGrid(g => ({ ...g, [row]: g[row].map((v, idx) => idx === s ? !v : v) }))}
-                            className="flex-1 rounded-sm transition-all"
-                            style={{
-                              height: 14,
-                              background: on ? ROW_COLORS[row] : active ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.04)',
-                              boxShadow: on ? `0 0 4px ${ROW_COLORS[row]}80` : 'none',
-                              border: i % 4 === 0
-                                ? `1px solid ${on ? ROW_COLORS[row] + '80' : 'rgba(124,58,237,0.22)'}`
-                                : `1px solid ${on ? ROW_COLORS[row] + '60' : 'rgba(255,255,255,0.04)'}`,
-                              opacity: on ? 1 : 0.45,
-                              cursor: 'pointer', padding: 0,
-                            }}
-                          />
-                        )
-                      })}
-                    </div>
+          {/* Loop indicator or 32-step sequencer grid depending on beat type */}
+          {isLoopBeat ? (
+            <div style={{ background: 'rgba(6,6,12,0.55)', borderRadius: 10, padding: '14px 16px', border: '1px solid rgba(46,46,74,0.4)', marginTop: 10 }}>
+              <div className="flex items-center gap-3">
+                <div style={{
+                  width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+                  background: isPlaying ? '#a855f7' : 'rgba(168,85,247,0.3)',
+                  boxShadow: isPlaying ? '0 0 8px #a855f7' : 'none',
+                  animation: isPlaying ? 'pulse 1s ease-in-out infinite' : 'none',
+                }} />
+                <div>
+                  <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'rgba(192,132,252,0.85)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+                    Live Loop
                   </div>
-                ))}
+                  <div style={{ fontSize: '0.62rem', color: 'rgba(148,163,184,0.45)', marginTop: 2 }}>
+                    Real drum recording · auto-matched to BPM
+                  </div>
+                </div>
               </div>
-            ))}
-          </div>
+            </div>
+          ) : (
+            <div style={{ background: 'rgba(6,6,12,0.55)', borderRadius: 10, padding: '10px 12px', border: '1px solid rgba(46,46,74,0.4)', marginTop: 10 }}>
+              {GRID_ROWS.map(row => (
+                <div key={row} className="mb-1.5">
+                  {[0, 16].map(barOffset => (
+                    <div key={barOffset} className="flex items-center gap-1 mb-px">
+                      <span style={{ width: 32, fontSize: '0.52rem', fontWeight: 700, color: barOffset === 0 ? ROW_COLORS[row] : 'transparent', letterSpacing: '0.08em', flexShrink: 0 }}>
+                        {ROW_LABELS[row]}
+                      </span>
+                      <span style={{ width: 14, fontSize: '0.42rem', color: 'rgba(148,163,184,0.25)', flexShrink: 0, textAlign: 'center' }}>
+                        {barOffset === 0 ? 'B1' : 'B2'}
+                      </span>
+                      <div className="flex gap-px flex-1">
+                        {Array.from({ length: 16 }).map((_, i) => {
+                          const s = barOffset + i
+                          const on = drumGrid[row][s]
+                          const active = isPlaying && s === currentStep
+                          return (
+                            <button
+                              key={s}
+                              onClick={() => setDrumGrid(g => ({ ...g, [row]: g[row].map((v, idx) => idx === s ? !v : v) }))}
+                              className="flex-1 rounded-sm transition-all"
+                              style={{
+                                height: 14,
+                                background: on ? ROW_COLORS[row] : active ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.04)',
+                                boxShadow: on ? `0 0 4px ${ROW_COLORS[row]}80` : 'none',
+                                border: i % 4 === 0
+                                  ? `1px solid ${on ? ROW_COLORS[row] + '80' : 'rgba(124,58,237,0.22)'}`
+                                  : `1px solid ${on ? ROW_COLORS[row] + '60' : 'rgba(255,255,255,0.04)'}`,
+                                opacity: on ? 1 : 0.45,
+                                cursor: 'pointer', padding: 0,
+                              }}
+                            />
+                          )
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* ── Chord Loop ── */}
@@ -258,10 +356,21 @@ export default function SessionTab({ root, scale, bpm, onChordChange,
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <span style={sectionLabel}>Chord Loop</span>
-              {isPlaying && (
+              {isPlaying && chordEnabled && (
                 <span className="w-1.5 h-1.5 rounded-full flex-shrink-0"
                   style={{ background: '#06b6d4', boxShadow: '0 0 6px #06b6d4', animation: 'pulse 1s ease-in-out infinite' }} />
               )}
+              <button
+                onClick={() => setChordEnabled(v => !v)}
+                style={{
+                  padding: '3px 9px', borderRadius: 7, fontSize: '0.62rem', fontWeight: 700,
+                  background: chordEnabled ? 'rgba(6,182,212,0.25)' : 'rgba(255,255,255,0.04)',
+                  border: chordEnabled ? '1px solid rgba(6,182,212,0.5)' : '1px solid rgba(255,255,255,0.1)',
+                  color: chordEnabled ? '#67e8f9' : 'rgba(148,163,184,0.4)',
+                  cursor: 'pointer', transition: 'all 0.15s ease',
+                }}>
+                {chordEnabled ? 'On' : 'Off'}
+              </button>
             </div>
             <div className="flex items-center gap-1.5 flex-shrink-0">
               <span style={{ fontSize: '0.58rem', fontWeight: 700, letterSpacing: '0.12em', color: 'rgba(168,85,247,0.5)', textTransform: 'uppercase' }}>Beats</span>

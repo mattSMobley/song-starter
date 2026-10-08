@@ -447,6 +447,13 @@ export const PRESET_LOOPS = RAW.map(({ id, name, category, emoji, root, scaleNam
 export const DRUM_LOOPS = [
   {
     id: 'drum-rock', name: 'Rock Steady', category: 'Drums', emoji: '🥁', bars: 2, bpm: 120,
+    loopFiles: [
+      { bpm:  80, src: '/drums/loops/alive87/rock-80.wav'  },
+      { bpm:  90, src: '/drums/loops/alive87/rock-90.wav'  },
+      { bpm: 100, src: '/drums/loops/alive87/rock-100.wav' },
+      { bpm: 115, src: '/drums/loops/alive87/rock-115.wav' },
+      { bpm: 120, src: '/drums/loops/alive87/rock-120.wav' },
+    ],
     hits: [
       // Bar 1
       { type: 'kick',  beat: 0 },   { type: 'hihat', beat: 0 },
@@ -466,6 +473,11 @@ export const DRUM_LOOPS = [
   },
   {
     id: 'drum-hiphop', name: 'Hip Hop', category: 'Drums', emoji: '🥁', bars: 2, bpm: 88,
+    loopFiles: [
+      { bpm:  70, src: '/drums/loops/dead-disco/hiphop-70.wav'  },
+      { bpm: 103, src: '/drums/loops/dead-disco/hiphop-103.wav' },
+      { bpm: 120, src: '/drums/loops/dead-disco/hiphop-120.wav' },
+    ],
     hits: [
       { type: 'kick',  beat: 0 },   { type: 'hihat', beat: 0 },
       { type: 'hihat', beat: 0.5 }, { type: 'snare', beat: 1 },
@@ -480,6 +492,13 @@ export const DRUM_LOOPS = [
   },
   {
     id: 'drum-funk', name: 'Funk Pocket', category: 'Drums', emoji: '🥁', bars: 2, bpm: 100,
+    loopFiles: [
+      { bpm:  80, src: '/drums/loops/alive87/funk-80.wav'  },
+      { bpm:  90, src: '/drums/loops/alive87/funk-90.wav'  },
+      { bpm: 100, src: '/drums/loops/alive87/funk-100.wav' },
+      { bpm: 115, src: '/drums/loops/alive87/funk-115.wav' },
+      { bpm: 120, src: '/drums/loops/alive87/funk-120.wav' },
+    ],
     hits: [
       // Bar 1 — 16th-note hats, syncopated kick, ghost snares
       { type: 'kick',  beat: 0 },    { type: 'hihat', beat: 0 },
@@ -522,6 +541,12 @@ export const DRUM_LOOPS = [
   },
   {
     id: 'drum-jazz', name: 'Jazz Brush', category: 'Drums', emoji: '🥁', bars: 2, bpm: 100,
+    loopFiles: [
+      { bpm:  80, src: '/drums/loops/alive87/jazz-80.wav'  },
+      { bpm: 100, src: '/drums/loops/alive87/jazz-100.wav' },
+      { bpm: 115, src: '/drums/loops/alive87/jazz-115.wav' },
+      { bpm: 120, src: '/drums/loops/alive87/jazz-120.wav' },
+    ],
     hits: [
       { type: 'hihat', beat: 0 },    { type: 'kick',  beat: 0 },
       { type: 'hihat', beat: 0.67 }, { type: 'hihat', beat: 1 },
@@ -539,6 +564,12 @@ export const DRUM_LOOPS = [
   },
   {
     id: 'drum-bossa', name: 'Bossa Nova', category: 'Drums', emoji: '🥁', bars: 2, bpm: 110,
+    loopFiles: [
+      { bpm:  90, src: '/drums/loops/alive87/bossa-90.wav'  },
+      { bpm: 100, src: '/drums/loops/alive87/bossa-100.wav' },
+      { bpm: 115, src: '/drums/loops/alive87/bossa-115.wav' },
+      { bpm: 120, src: '/drums/loops/alive87/bossa-120.wav' },
+    ],
     hits: [
       { type: 'hihat', beat: 0 },    { type: 'kick',  beat: 0 },
       { type: 'hihat', beat: 0.5 },  { type: 'hihat', beat: 0.75 },
@@ -557,6 +588,11 @@ export const DRUM_LOOPS = [
   },
   {
     id: 'drum-electronic', name: 'Four on Floor', category: 'Drums', emoji: '🥁', bars: 2, bpm: 128,
+    loopFiles: [
+      { bpm: 103, src: '/drums/loops/dead-disco/disco-103.wav' },
+      { bpm: 120, src: '/drums/loops/dead-disco/disco-120.wav' },
+      { bpm: 140, src: '/drums/loops/dead-disco/disco-140.wav' },
+    ],
     hits: [
       // Kick on every quarter note (the defining feature of four-on-the-floor)
       // Snare on 2 & 4 of each bar, 8th-note hats, open hat on the off-beats
@@ -580,6 +616,12 @@ export const DRUM_LOOPS = [
   },
   {
     id: 'drum-breakbeat', name: 'Breakbeat', category: 'Drums', emoji: '🥁', bars: 2, bpm: 110,
+    loopFiles: [
+      { bpm:  90, src: '/drums/loops/alive87/break-90.wav'  },
+      { bpm: 100, src: '/drums/loops/alive87/break-100.wav' },
+      { bpm: 115, src: '/drums/loops/alive87/break-115.wav' },
+      { bpm: 120, src: '/drums/loops/alive87/break-120.wav' },
+    ],
     hits: [
       { type: 'kick',  beat: 0 },    { type: 'hihat', beat: 0 },
       { type: 'hihat', beat: 0.5 },  { type: 'snare', beat: 0.75 },
@@ -599,6 +641,12 @@ export const DRUM_LOOPS = [
   },
   {
     id: 'drum-rnb', name: 'R&B Slow Jam', category: 'Drums', emoji: '🥁', bars: 2, bpm: 72,
+    loopFiles: [
+      { bpm:  80, src: '/drums/loops/alive87/rnb-80.wav'  },
+      { bpm:  90, src: '/drums/loops/alive87/rnb-90.wav'  },
+      { bpm: 100, src: '/drums/loops/alive87/rnb-100.wav' },
+      { bpm: 115, src: '/drums/loops/alive87/rnb-115.wav' },
+    ],
     hits: [
       // Consistent 8th-note hats, syncopated kick, snare on 2 & 4
       { type: 'kick',  beat: 0 },   { type: 'hihat', beat: 0 },
@@ -619,6 +667,12 @@ export const DRUM_LOOPS = [
   },
   {
     id: 'drum-samba', name: 'Samba', category: 'Drums', emoji: '🥁', bars: 2, bpm: 120,
+    loopFiles: [
+      { bpm:  90, src: '/drums/loops/alive87/samba-90.wav'  },
+      { bpm: 100, src: '/drums/loops/alive87/samba-100.wav' },
+      { bpm: 115, src: '/drums/loops/alive87/samba-115.wav' },
+      { bpm: 120, src: '/drums/loops/alive87/samba-120.wav' },
+    ],
     hits: [
       // Bar 1 — kick on 1 & 3, snare rimshots on the offbeats, 16th hat roll
       { type: 'kick',  beat: 0 },    { type: 'hihat', beat: 0 },
