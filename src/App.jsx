@@ -371,6 +371,10 @@ export default function App() {
               Start Creating
             </button>
           </div>
+          <a href="?kids" className="reveal-up flex items-center gap-2 rounded-full"
+            style={{ animationDelay: '0.5s', padding: '10px 22px', background: 'linear-gradient(90deg, #ef4444, #f97316, #facc15, #4ade80, #14b8a6, #a855f7)', color: '#fff', fontWeight: 700, fontSize: '0.95rem', textShadow: '0 1px 2px rgba(0,0,0,0.4)', textDecoration: 'none' }}>
+            🎈 Kids Mode
+          </a>
           <div className="reveal-up flex items-center gap-4" style={{ animationDelay: '0.56s' }}>
             {['No account needed', 'Works offline', '100% in-browser'].map((t, i) => (
               <span key={t} className="flex items-center gap-4">
