@@ -1,4 +1,10 @@
-@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@500;700&display=swap');
+/* Fredoka (SIL Open Font License), self-hosted so it works offline / in the iPad app */
+@font-face {
+  font-family: 'Fredoka';
+  font-weight: 500 700;
+  font-display: swap;
+  src: url('/fonts/fredoka-latin.woff2') format('woff2');
+}
 
 /* ── Mood: major = warm twilight, minor = cool night (Palmer et al. 2013) ── */
 .kids-root {
@@ -205,6 +211,7 @@
 
 /* ── Play column ────────────────────────────────────────────────────────── */
 .play-col { display: flex; flex-direction: column; align-items: center; gap: 18px; flex: none; }
+.play-col .tape-btn { margin-top: 10px; }
 .play-btn {
   width: 128px; height: 128px; border-radius: 50%; font-size: 54px;
   background: radial-gradient(circle at 35% 30%, #9cffc8, #22c55e 60%, #15803d);
@@ -281,6 +288,117 @@
 .mr-side i { font-style: normal; font-size: 14px; letter-spacing: -1px; }
 .mr-side.on { opacity: 1; background: rgba(255,255,255,0.2); }
 
+/* ── Tapes (saved songs) ────────────────────────────────────────────────── */
+.tape-btn {
+  width: 72px; height: 72px; border-radius: 22px; font-size: 40px;
+  background: var(--panel); border: 2px solid var(--panel-edge);
+}
+.tape-btn.glow { animation: halo 1.4s ease-in-out infinite; }
+
+.tape {
+  position: relative; width: 220px; height: 140px; flex: none;
+  border-radius: 16px; padding: 12px 14px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--tape) 80%, white), var(--tape));
+  box-shadow: inset 0 -6px 0 rgba(0,0,0,0.18), 0 8px 18px rgba(0,0,0,0.35);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.tape-label {
+  display: flex; justify-content: center; gap: 8px; height: 50px; align-items: center;
+  border-radius: 10px; background: #fffaf0;
+}
+.tape-sticker { width: 40px; text-align: center; font-size: 34px; line-height: 1; }
+.tape-window {
+  margin: 0 auto; width: 120px; height: 44px; border-radius: 22px;
+  background: rgba(20, 12, 40, 0.75);
+  display: flex; align-items: center; justify-content: space-between; padding: 0 12px;
+}
+.reel {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: repeating-conic-gradient(#fff 0 30deg, #bbb 30deg 60deg);
+  border: 5px solid #e9e4f5;
+}
+.tape.spinning .reel { animation: spin 2.2s linear infinite; }
+.tape-key {
+  position: absolute; right: 10px; bottom: 6px; font-size: 16px; color: #fff;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+}
+.tape.small { width: 150px; height: 96px; padding: 8px 10px; gap: 6px; border-radius: 12px; }
+.tape.small .tape-label { height: 34px; gap: 4px; }
+.tape.small .tape-sticker { width: 28px; font-size: 24px; }
+.tape.small .tape-window { width: 84px; height: 30px; padding: 0 8px; }
+.tape.small .reel { width: 18px; height: 18px; border-width: 3px; }
+.tape.small .tape-key { font-size: 12px; bottom: 4px; }
+
+.deck-scrim {
+  position: absolute; inset: 0; z-index: 20;
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+  background: rgba(8, 4, 24, 0.6);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  animation: fadeIn 0.2s ease;
+}
+.deck {
+  position: relative; width: min(920px, 100%); max-height: 100%;
+  display: flex; flex-direction: column; gap: 18px; padding: 24px;
+  border-radius: 32px; background: #241a4f; border: 3px solid var(--panel-edge);
+  box-shadow: 0 30px 60px rgba(0,0,0,0.5);
+  overflow: hidden;
+  animation: popIn 0.25s cubic-bezier(0.5, 1.6, 0.5, 1);
+}
+.kids-root.minor .deck { background: #0f1d3d; }
+.deck-close {
+  position: absolute; top: 14px; right: 14px; width: 56px; height: 56px; border-radius: 18px;
+  font-size: 26px; background: var(--panel);
+}
+.deck-save { display: grid; grid-template-columns: auto 1fr; gap: 14px 22px; align-items: center; padding-right: 60px; }
+.deck-save .tape { grid-row: 1 / span 2; }
+.sticker-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 8px; }
+.sticker {
+  aspect-ratio: 1; border-radius: 16px; font-size: 32px;
+  background: rgba(255,255,255,0.08); border: 2px solid transparent;
+  transition: transform 0.1s;
+}
+.sticker:active { transform: scale(0.88); }
+.sticker.on { border-color: #fff; background: rgba(255,255,255,0.22); }
+.deck-save-row { display: flex; gap: 12px; align-items: center; }
+.deck-name {
+  flex: 1; min-width: 0; height: 52px; border-radius: 16px; padding: 0 14px;
+  font: inherit; font-size: 20px; color: var(--ink);
+  background: rgba(255,255,255,0.08); border: 2px solid var(--panel-edge); outline: none;
+}
+.deck-ok {
+  width: 96px; height: 72px; border-radius: 22px; font-size: 40px;
+  background: rgba(255,255,255,0.08); opacity: 0.4;
+}
+.deck-ok.ready {
+  opacity: 1;
+  background: radial-gradient(circle at 35% 30%, #9cffc8, #22c55e 60%, #15803d);
+  box-shadow: 0 6px 0 #14532d; animation: breathe 1.6s ease-in-out infinite;
+}
+.shelf {
+  display: flex; gap: 16px; overflow-x: auto; padding: 8px 4px 14px;
+  border-top: 2px dashed var(--panel-edge); padding-top: 18px;
+  min-height: 150px; align-items: flex-start;
+}
+.shelf::-webkit-scrollbar { display: none; }
+.shelf-empty { margin: auto; font-size: 64px; opacity: 0.25; }
+.shelf-item { position: relative; flex: none; display: flex; flex-direction: column; align-items: center; }
+.shelf-item.new { animation: popIn 0.4s cubic-bezier(0.5, 1.6, 0.5, 1); }
+.shelf-tape { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.shelf-tape:active { transform: scale(0.95); }
+.shelf-name { font-size: 14px; font-weight: 500; opacity: 0.8; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shelf-del {
+  position: absolute; top: -10px; right: -10px; width: 40px; height: 40px; border-radius: 50%;
+  font-size: 18px; background: #3b2a6e; border: 2px solid var(--panel-edge); overflow: hidden;
+}
+.shelf-del::after { content: ''; position: absolute; left: 0; bottom: 0; width: 100%; height: 0; background: rgba(239,68,68,0.6); }
+.shelf-del.holding::after { animation: fillUp 1s linear forwards; }
+
+@media (orientation: portrait), (max-width: 760px) {
+  .deck-save { grid-template-columns: 1fr; justify-items: center; padding-right: 0; padding-top: 50px; }
+  .deck-save .tape { grid-row: auto; }
+  .sticker-grid { width: 100%; }
+}
+
 /* ── Motion ─────────────────────────────────────────────────────────────── */
 @keyframes bob { 0%, 100% { translate: 0 0; } 50% { translate: 0 -6px; } }
 @keyframes breathe { 0%, 100% { scale: 1; } 50% { scale: 1.06; } }
@@ -303,9 +421,36 @@
 }
 @keyframes loading { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
 @keyframes fillUp { to { height: 100%; } }
+@keyframes fadeIn { from { opacity: 0; } }
+@keyframes popIn { from { transform: scale(0.85); opacity: 0; } }
 
 @media (prefers-reduced-motion: reduce) {
   .kids-root *, .kids-root *::before, .kids-root *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
+}
+
+/* Phones: stack everything and let the page scroll vertically */
+@media (max-width: 600px) {
+  .kids-root { display: flex; flex-direction: column; overflow-y: auto; padding-left: 12px; padding-right: 12px; }
+  .kids-root > * { flex: none; }
+  .slots { height: auto; }
+  .song-bar { justify-content: space-between; }
+  .song-bar { padding: 10px 8px; }
+  .key-bells { flex-basis: 100%; max-width: none; order: 3; height: 72px; gap: 4px; }
+  .bell { min-width: 44px; min-height: 48px; font-size: 20px; }
+  .tempo-lever { min-width: 0; max-width: none; flex: 1 1 100%; order: 4; }
+  .surprise { width: 60px; height: 60px; font-size: 30px; margin-left: 0; }
+  .stage { flex-direction: column; }
+  .slots, .slots.n4, .slots.n6 { --cols: 2; width: 100%; grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); }
+  .slots.n3 { --cols: 3; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .slots.n3 .slot-icon { width: 72px; height: 72px; font-size: 42px; }
+  .play-col { flex-direction: row; gap: 16px; }
+  .play-col .tape-btn { margin-top: 0; }
+  .tray { flex-wrap: wrap; gap: 8px; }
+  .tray.open { height: auto; padding: 4px 0; }
+  .bottom-row { flex-direction: column; align-items: stretch; }
+  .bank { flex: none; }
+  .corner-tools { grid-template-columns: repeat(4, 48px); justify-content: end; }
+  .corner-tools .meter-rocker { grid-column: auto / span 1; }
 }
 
 /* Small screens (phones) — shrink, still usable */

@@ -11,7 +11,6 @@ const LOOKAHEAD = 0.15
 const TICK_MS   = 20
 const MAX_SLOTS = 6
 const VOLUMES   = [0.35, 0.7, 1]
-const ROLE_DB   = { bass: -3, comp: -9, melody: -6, sparkle: -9, pad: -12 }
 const ROLE_RELEASE = { bass: 0.4, comp: 0.8, melody: 0.5, sparkle: 1.2, pad: 1.6 }
 // Roles whose sustained notes count as "busy" when a complement looks for gaps
 const HOLD_IS_BUSY = new Set(['bass', 'comp', 'melody', 'sparkle'])
@@ -40,15 +39,16 @@ export const onLoadChange = cb => (loadListeners.add(cb), () => loadListeners.de
 // ── Audio graph ──────────────────────────────────────────────────────────────
 export async function initKidsAudio() {
   if (ready) return
-  await startAudio()   // shared iOS unlock + keepalive lives in engine.js
-  // iOS 17+: play through the silent switch, like a music app
+  // iOS 17+: play through the silent switch, like a music app. Must be set
+  // before the AudioContext starts.
   try { if (navigator.audioSession) navigator.audioSession.type = 'playback' } catch (e) {}
+  await startAudio()   // shared iOS unlock + keepalive lives in engine.js
 
   limiter = new Tone.Limiter(-3)
   if (isIOS) limiter.connect(Tone.getContext().rawContext.destination)
   else limiter.toDestination()
 
-  bus = new Tone.Gain(0.9).connect(limiter)
+  bus = new Tone.Gain(0.7).connect(limiter)
 
   // Convolver with a generated impulse — Tone.Reverb's OfflineAudioContext
   // re-suspends iOS audio (see engine.js), a plain ConvolverNode doesn't.
@@ -64,6 +64,7 @@ export async function initKidsAudio() {
     voices.push(null)
   }
   ready = true
+  setSlots(slots)
 }
 
 function makeImpulse(seconds) {
@@ -78,22 +79,25 @@ function makeImpulse(seconds) {
 }
 
 // ── Sample loading (cached per instrument, sampler per slot) ─────────────────
-const bufferCache = new Map()   // instId → Promise<{ [midi]: ToneAudioBuffer }>
+// Each file loads on its own with retries, so one flaky download can't leave
+// an instrument silent — the sampler just stretches its nearest neighbor.
+function loadBuffer(url, tries = 3) {
+  return new Tone.ToneAudioBuffer().load(url).catch(() =>
+    tries > 1 ? new Promise(r => setTimeout(r, 700)).then(() => loadBuffer(url, tries - 1)) : null)
+}
+async function loadAll(urlMap) {
+  const entries = await Promise.all(Object.entries(urlMap).map(async ([k, u]) => [k, await loadBuffer(u)]))
+  const ok = entries.filter(([, b]) => b)
+  if (!ok.length) throw new Error('no samples loaded')
+  return ok
+}
 
+const bufferCache = new Map()   // instId → Promise<[midi, ToneAudioBuffer][]>
 function loadInstBuffers(inst) {
   if (!bufferCache.has(inst.id)) {
-    bufferCache.set(inst.id, new Promise((resolve, reject) => {
-      const urls = sampleUrls(inst)
-      const bufs = new Tone.ToneAudioBuffers({
-        urls,
-        onload: () => {
-          const out = {}
-          for (const m of Object.keys(urls)) out[m] = bufs.get(m)
-          resolve(out)
-        },
-        onerror: e => { bufferCache.delete(inst.id); reject(e) },
-      })
-    }))
+    const p = loadAll(sampleUrls(inst))
+    p.catch(() => bufferCache.delete(inst.id))   // allow a fresh try next time
+    bufferCache.set(inst.id, p)
   }
   return bufferCache.get(inst.id)
 }
@@ -101,20 +105,13 @@ function loadInstBuffers(inst) {
 const kitCache = new Map()      // kitId → Promise<Map<key, AudioBuffer>>
 function loadKit(kitId) {
   if (!kitCache.has(kitId)) {
-    kitCache.set(kitId, new Promise(resolve => {
-      const map = {}
-      for (const [type, layers] of Object.entries(DRUM_KITS[kitId]))
-        for (const [layer, files] of Object.entries(layers))
-          files.forEach((f, i) => { map[`${type}|${layer}|${i}`] = '/' + f })
-      const bufs = new Tone.ToneAudioBuffers({
-        urls: map,
-        onload: () => {
-          const out = new Map()
-          for (const k of Object.keys(map)) out.set(k, bufs.get(k).get())
-          resolve(out)
-        },
-      })
-    }))
+    const map = {}
+    for (const [type, layers] of Object.entries(DRUM_KITS[kitId]))
+      for (const [layer, files] of Object.entries(layers))
+        files.forEach((f, i) => { map[`${type}|${layer}|${i}`] = '/' + f })
+    const p = loadAll(map).then(ok => new Map(ok.map(([k, b]) => [k, b.get()])))
+    p.catch(() => kitCache.delete(kitId))
+    kitCache.set(kitId, p)
   }
   return kitCache.get(kitId)
 }
@@ -135,25 +132,27 @@ function syncVoice(i) {
     const kitId = VIBE_KITS[s.vibe]
     if (!v || v.instId !== s.inst) { v?.sampler?.dispose(); voices[i] = { instId: s.inst, loaded: loadedKits.size > 0 } }
     if (!loadedKits.has(kitId)) {
-      loadKit(kitId).then(m => { loadedKits.set(kitId, m); markLoaded(i, s.inst) })
+      loadKit(kitId).then(m => { loadedKits.set(kitId, m); markLoaded(i, s.inst) }).catch(() => {})
     } else markLoaded(i, s.inst)
     return
   }
 
-  if (v?.instId === s.inst) return
+  if (v?.instId === s.inst && (v.loaded || v.pending)) return
   v?.sampler?.dispose()
-  voices[i] = { instId: s.inst, sampler: null, loaded: false }
+  voices[i] = { instId: s.inst, sampler: null, loaded: false, pending: true }
   emitLoad()
   loadInstBuffers(inst).then(bufs => {
     if (voices[i]?.instId !== s.inst) return   // slot changed while loading
     const urls = {}
-    for (const [m, b] of Object.entries(bufs)) urls[Tone.Frequency(+m, 'midi').toNote()] = b
+    for (const [m, b] of bufs) urls[Tone.Frequency(+m, 'midi').toNote()] = b
     const sampler = new Tone.Sampler({
-      urls, attack: 0.005, release: ROLE_RELEASE[inst.role], volume: ROLE_DB[inst.role] ?? -6,
+      urls, attack: 0.005, release: ROLE_RELEASE[inst.role],
+      volume: inst.db ?? 0,
     }).connect(channels[i])
     voices[i].sampler = sampler
+    voices[i].pending = false
     markLoaded(i, s.inst)
-  }).catch(() => {})
+  }).catch(() => { if (voices[i]?.instId === s.inst) voices[i].pending = false })   // retried on next change
 }
 function markLoaded(i, instId) {
   if (voices[i]?.instId === instId) voices[i].loaded = true
@@ -165,9 +164,20 @@ function emitLoad() {
 }
 export const instLoaded = i => !!voices[i]?.loaded
 
+// Warm the sample cache in the background so the first tap plays fast
+export function prefetch(instIds) {
+  instIds.forEach(id => {
+    const inst = instById(id)
+    if (!inst) return
+    if (inst.role === 'beat') loadKit(VIBE_KITS[2]).then(m => loadedKits.set(VIBE_KITS[2], m)).catch(() => {})
+    else loadInstBuffers(inst).catch(() => {})
+  })
+}
+
 // ── Public controls ──────────────────────────────────────────────────────────
 export function setSlots(next) {
   slots = next
+  if (!ready) return            // synced once the audio graph exists
   for (let i = 0; i < MAX_SLOTS; i++) syncVoice(i)
   if (!slots.some(Boolean)) stop()
 }
@@ -213,6 +223,9 @@ function tick() {
   if (!playing) return
   const ctx = Tone.getContext().rawContext
   const ahead = ctx.currentTime + LOOKAHEAD
+  // Timers stall while the tab is in the background — skip what we missed
+  // instead of firing it all at once when we come back.
+  if (nextTime < ctx.currentTime - 0.05) nextTime = ctx.currentTime + 0.05
   while (nextTime < ahead) {
     scheduleStep(nextTime, ctx.currentTime)
     nextTime += stepSeconds()
@@ -255,7 +268,8 @@ function scheduleStep(t, now) {
       hit = playDrums(i, PATTERNS[s.vibe][song.meter].beat, absStep, t)
     } else {
       const own = PATTERNS[s.vibe][song.meter][role]
-      const complement = i !== li && vibeDistance(s.vibe, leader.vibe) === 3
+      // Pads stay sustained — chopping them into gaps sounds broken
+      const complement = i !== li && role !== 'pad' && vibeDistance(s.vibe, leader.vibe) === 3
       const ev = complement
         ? complementEvent(own, leader, absStep, role)
         : patternEvent(own, absStep)
@@ -315,9 +329,10 @@ function playPitched(i, inst, ev, chordDeg, rank, t) {
   if (!sampler) return
   const wrapRoot = inst.role === 'bass' || inst.role === 'comp' || inst.role === 'pad'
   const root = wrapRoot && chordDeg >= 4 ? chordDeg - 7 : chordDeg
-  const base = inst.base + keyOffset(song.key) + 12 * ((slots[i].oct ?? 0) + rank)
-  // Fold back into the instrument's sweet spot (and its sample range)
-  const shift = 12 * (slots[i].oct ?? 0)
+  // Fold back into the instrument's sweet spot (and its sample range).
+  // The window moves with the octave choice and same-role stacking.
+  const shift = 12 * ((slots[i].oct ?? 0) + rank)
+  const base = inst.base + keyOffset(song.key) + shift
   const lo = Math.max(inst.base - 24, inst.base - 12 + shift)
   const hi = Math.min(inst.base + 36, inst.base + 30 + shift)
   const midiOf = steps => {
@@ -353,6 +368,7 @@ function playDrums(i, pat, absStep, t) {
   const kitDef = DRUM_KITS[kitId]
   const ctx = Tone.getContext().rawContext
   const onBeat = absStep % 4 === 0
+  const drumTrim = Math.pow(10, (instById(slots[i].inst).db ?? 0) / 20)
   let hit = false
   for (const [code, str] of Object.entries(pat)) {
     const c = str[absStep % str.length]
@@ -370,7 +386,7 @@ function playDrums(i, pat, absStep, t) {
     const src = ctx.createBufferSource()
     src.buffer = buf
     const g = ctx.createGain()
-    g.gain.value = c === 'g' ? 0.35 : type === 'hihat' ? (onBeat ? 0.6 : 0.42) : 0.9
+    g.gain.value = drumTrim * (c === 'g' ? 0.35 : type === 'hihat' ? (onBeat ? 0.6 : 0.42) : 0.9)
     src.connect(g)
     g.connect(channels[i].input)
     // tiny humanize on hats so it doesn't feel robotic

@@ -5,10 +5,14 @@ import { INSTRUMENTS, instById } from './instruments.js'
 import { TIERS, tierForAge, VIBES, KEYS } from './theory.js'
 import VibeDial from './VibeDial.jsx'
 import { ModeFlip, KeyBells, TempoLever, MeterRocker } from './SongControls.jsx'
+import TapeDeck from './TapeDeck.jsx'
 
 const MAX_SLOTS = 6
 const AGES = [3, 4, 5, 6, 7, 8, 9]
 const DEFAULT_SONG = { key: 'C', mode: 'major', meter: 4, tempoScale: 1 }
+const MAX_TAPES = 40
+// Neutral balloon colors — not letter or vibe colors, so they don't imply a meaning
+const BALLOONS = ['#f9a8d4', '#93c5fd', '#fcd34d', '#a5b4fc', '#86efac', '#fdba74', '#c4b5fd']
 
 function load(key, fallback) {
   try { const v = localStorage.getItem(key); return v == null ? fallback : JSON.parse(v) } catch { return fallback }
@@ -20,12 +24,36 @@ function save(key, value) {
 let uidSeq = Date.now()
 const newUid = () => ++uidSeq
 
+// Persisted data may come from an older version — keep only slots we can play
+function cleanSlots(list) {
+  const out = Array(MAX_SLOTS).fill(null)
+  ;(Array.isArray(list) ? list : []).slice(0, MAX_SLOTS).forEach((s, i) => {
+    if (s && instById(s.inst) && s.vibe >= 0 && s.vibe < 6) out[i] = { vol: 1, oct: 0, muted: false, ...s, uid: s.uid ?? newUid() }
+  })
+  return out
+}
+function cleanSong(raw) {
+  const s = { ...DEFAULT_SONG, ...(raw && typeof raw === 'object' ? raw : {}) }
+  if (!KEYS.some(k => k.letter === s.key)) s.key = 'C'
+  if (s.mode !== 'minor') s.mode = 'major'
+  if (s.meter !== 3) s.meter = 4
+  if (!(s.tempoScale > 0.5 && s.tempoScale < 1.5)) s.tempoScale = 1
+  return s
+}
+
+// Pick a friendly voice when one exists (iPad: Samantha), else the default
+function pickVoice() {
+  const voices = window.speechSynthesis?.getVoices?.() ?? []
+  return ['Samantha', 'Karen', 'Moira', 'Google US English'].map(n => voices.find(v => v.name.startsWith(n))).find(Boolean)
+    ?? voices.find(v => v.lang?.startsWith('en'))
+}
+
 export default function KidsApp() {
   const [age, setAge]           = useState(() => load('kids_age', null))
   const [screen, setScreen]     = useState('gate')       // gate | play
   const [audioOn, setAudioOn]   = useState(false)
-  const [slots, setSlots]       = useState(() => load('kids_slots', Array(MAX_SLOTS).fill(null)))
-  const [song, setSong]         = useState(() => ({ ...DEFAULT_SONG, ...load('kids_song', {}) }))
+  const [slots, setSlots]       = useState(() => cleanSlots(load('kids_slots', null)))
+  const [song, setSong]         = useState(() => cleanSong(load('kids_song', null)))
   const [selected, setSelected] = useState(null)
   const [touched, setTouched]   = useState(() => new Set(load('kids_touched', [])))
   const [playing, setPlaying]   = useState(false)
@@ -34,6 +62,8 @@ export default function KidsApp() {
   const [idle, setIdle]         = useState(false)
   const [wiggle, setWiggle]     = useState(false)
   const [pickingAge, setPickingAge] = useState(false)
+  const [deckOpen, setDeckOpen] = useState(false)
+  const [tapes, setTapes]       = useState(() => (Array.isArray(load('kids_tapes', [])) ? load('kids_tapes', []) : []))
 
   const tier = TIERS[tierForAge(age ?? 5)]
   const n = tier.slots
@@ -49,7 +79,16 @@ export default function KidsApp() {
   useEffect(() => { save('kids_slots', slots); engine.setSlots(slots.map((s, i) => (i < n ? s : null))) }, [slots, n])
   useEffect(() => { save('kids_song', song); engine.setSong(song) }, [song])
   useEffect(() => { save('kids_touched', [...touched]) }, [touched])
+  useEffect(() => { save('kids_tapes', tapes) }, [tapes])
   useEffect(() => engine.onLoadChange(setLoaded), [])
+
+  // No pinch-zoom or double-tap zoom while kids are poking around (iOS Safari)
+  useEffect(() => {
+    const stop = e => e.preventDefault()
+    document.addEventListener('gesturestart', stop)
+    document.addEventListener('dblclick', stop)
+    return () => { document.removeEventListener('gesturestart', stop); document.removeEventListener('dblclick', stop) }
+  }, [])
 
   // Note lights + beat dots: DOM class pulses, no React re-render per note
   useEffect(() => engine.onNote(i => pulse(iconRefs.current[i])), [])
@@ -60,6 +99,8 @@ export default function KidsApp() {
     if (!voiceOn || spoken.current.has(id) || !window.speechSynthesis) return
     spoken.current.add(id)
     const u = new SpeechSynthesisUtterance(text)
+    const voice = pickVoice()
+    if (voice) u.voice = voice
     u.rate = 0.95
     u.pitch = 1.25
     window.speechSynthesis.cancel()
@@ -74,6 +115,7 @@ export default function KidsApp() {
     idleTimer.current = setTimeout(() => setIdle(true), 15000)
   }, [])
   useEffect(() => () => clearTimeout(idleTimer.current), [])
+  useEffect(() => { if (idle) setSelected(null) }, [idle])   // a forgotten selection would turn the next bank tap into a swap
   useEffect(() => { if (idle && playing) say('mood', 'Happy… or sad?') }, [idle, playing, say])
 
   // ── Start / age ────────────────────────────────────────────────────────────
@@ -87,6 +129,7 @@ export default function KidsApp() {
     }
     await init
     setAudioOn(true)
+    engine.prefetch(INSTRUMENTS.slice(0, 5).map(i => i.id))
     if (pickedAge) for (let k = 0; k < pickedAge; k++) setTimeout(() => engine.blip(k), 140 * k)
     setScreen('play')
     poke()
@@ -118,7 +161,7 @@ export default function KidsApp() {
       ? { ...existing, inst: instId }
       : { uid: newUid(), inst: instId, vibe: leader ? leader.vibe : 2, vol: 1, oct: 0, muted: false }
     setSlots(prev => prev.map((s, i) => (i === target ? slot : s)))
-    if (!existing) setSelected(null)
+    setSelected(null)
     if (!engine.isPlaying()) { engine.play(); setPlaying(true) }
     say('dial', 'Turn the dial!')
   }
@@ -158,6 +201,31 @@ export default function KidsApp() {
     ;[0, 2, 4, 5].forEach((k, j) => setTimeout(() => engine.blip(k), j * 90))
   }
 
+  // ── Tapes (saved songs) ────────────────────────────────────────────────────
+  function openDeck() {
+    poke()
+    setDeckOpen(true)
+    say('deck', active.some(Boolean) ? 'Pick stickers for your song!' : 'Pick a song!')
+  }
+
+  function saveTape({ stickers, name }) {
+    const id = newUid()
+    const tape = { id, stickers, name, song, slots: active.map(s => s && { ...s }), created: Date.now() }
+    setTapes(prev => [tape, ...prev].slice(0, MAX_TAPES))
+    ;[0, 2, 4, 5].forEach((k, j) => setTimeout(() => engine.blip(k), j * 110))
+    return id
+  }
+
+  function loadTape(tape) {
+    const fresh = cleanSlots(tape.slots).map(s => s && { ...s, uid: newUid() })
+    setSlots(fresh)
+    setSong(cleanSong(tape.song))
+    setTouched(prev => { const t = new Set(prev); fresh.forEach(s => s && t.add(s.uid)); return t })
+    setSelected(null)
+    setDeckOpen(false)
+    if (fresh.some(Boolean) && !engine.isPlaying()) { engine.play(); setPlaying(true) }
+  }
+
   // ── Glow guidance (suggests, never blocks) ─────────────────────────────────
   const filled = active.map((s, i) => (s ? i : -1)).filter(i => i >= 0)
   const untouched = filled.filter(i => !touched.has(active[i].uid))
@@ -167,6 +235,7 @@ export default function KidsApp() {
     : untouched.length
       ? { dial: untouched[untouched.length - 1] }
       : firstEmpty >= 0 ? { bank: 'soft', slot: firstEmpty } : {}
+  if (filled.length >= 2 && !untouched.length && !tapes.length) guide.tape = true
 
   // ── Screens ────────────────────────────────────────────────────────────────
   if (screen === 'gate') {
@@ -183,7 +252,7 @@ export default function KidsApp() {
               <div className="gate-cake">🎂</div>
               <div className="balloons">
                 {AGES.map((a, i) => (
-                  <button key={a} className="balloon" style={{ '--b': VIBES[i % 6].hue, animationDelay: `${i * 0.15}s` }}
+                  <button key={a} className="balloon" style={{ '--b': BALLOONS[i], animationDelay: `${i * 0.15}s` }}
                     onClick={() => pickAge(a)}>
                     {a === 9 ? '9+' : a}
                   </button>
@@ -222,6 +291,7 @@ export default function KidsApp() {
                 {i === leaderIdx && <span className="crown">👑</span>}
                 <button ref={el => (iconRefs.current[i] = el)}
                   className={`slot-icon ${s && loaded[i] === false ? 'loading' : ''}`}
+                  aria-label={s ? inst.id : 'empty'}
                   onClick={() => setSelected(selected === i ? null : i)}>
                   {s ? (s.muted ? '😴' : inst.icon) : '+'}
                 </button>
@@ -244,6 +314,7 @@ export default function KidsApp() {
               <span key={b} ref={el => (beatRefs.current[b] = el)} className={b === 0 ? 'one' : ''} />
             ))}
           </div>
+          <button className={`tape-btn ${guide.tape ? 'glow' : ''}`} aria-label="tapes" onClick={openDeck}>📼</button>
         </div>
       </main>
 
@@ -278,7 +349,7 @@ export default function KidsApp() {
       {/* ── Instrument bank ── */}
       <footer className={`bank ${guide.bank ? `glow-${guide.bank}` : ''}`}>
         {INSTRUMENTS.slice(0, tier.bankSize).map(inst => (
-          <button key={inst.id} className="bank-btn" onClick={() => addInstrument(inst.id)}>
+          <button key={inst.id} className="bank-btn" aria-label={inst.id} onClick={() => addInstrument(inst.id)}>
             {inst.icon}
           </button>
         ))}
@@ -294,6 +365,12 @@ export default function KidsApp() {
         <HoldButton onHold={() => { engine.stop(); window.location.href = window.location.pathname }}>🏠</HoldButton>
       </div>
       </div>
+
+      {deckOpen && (
+        <TapeDeck tapes={tapes} song={song} canSave={filled.length > 0}
+          onSave={saveTape} onLoad={loadTape} onClose={() => setDeckOpen(false)}
+          onDelete={id => setTapes(prev => prev.filter(t => t.id !== id))} />
+      )}
     </div>
   )
 }

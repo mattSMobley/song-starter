@@ -214,9 +214,29 @@ Kids will max everything, so the limiter is mandatory.
 
 ---
 
+### QA round 3 — pre-deploy pass (2026-10-08)
+
+| # | Problem | Fix |
+|---|---|---|
+| 25 | **Mix badly unbalanced** — measured solo RMS: drums −23 dBFS, most melodic instruments −45 to −60 (soundfont samples are mastered very quietly) | Per-instrument `db` trims calibrated by measurement; all instruments now within ~1 dB of their role target |
+| 26 | One failed sample download left an instrument **silent forever** with a stuck "loading" pulse | Per-file loading with 3 retries; an instrument plays with whatever samples arrived; whole-instrument failures retry on the next change |
+| 27 | Returning visitor with a saved song → **crash** (engine synced slots before audio existed) | Slots are stored and synced when the audio graph is ready |
+| 28 | Coming back to a backgrounded tab fired every missed note at once | Scheduler skips missed time |
+| 29 | Pads got the 🧩 complement treatment (choppy) | Complement only for bass/comp/melody/sparkle |
+| 30 | Same-role octave stacking could be folded back into unison | Register window moves with the stacking octave |
+| 31 | iOS `audioSession` was set after the context started | Set before |
+| 32 | A forgotten selection turned the next bank tap into a swap | Selection clears after a swap and after 15 s idle |
+| 33 | Corrupt or old saved data could crash the page | Saved slots/song/tapes are validated on load |
+| 34 | Google Fonts dependency | Fredoka self-hosted (`public/fonts`) |
+| 35 | Phone layout overlapped / tiny key bells | Phone layout is a scrolling column; all targets ≥44 px |
+| 36 | Balloons reused vibe colors | Neutral pastel palette |
+| 37 | Pinch / double-tap zoom on iPad | Blocked in kids mode |
+
+**Saving (Phase 3, pulled forward):** 📼 opens the Tape Deck. Kids name a song with up to 3 stickers (plus an optional grown-up text name). Tapes are colored by key and show ☀️/🌙. Tap a tape to load it; hold 🗑️ for 1 s to delete. The 📼 glows once a song is built and nothing has been saved. Stored locally (max 40).
+
 ## 12. Status
 
-**Phase 0 is built** (`src/kids/`, open with `?kids` or the 🎈 Kids Mode button on the splash).
+**Phase 0 + saving are built and deployed** (`src/kids/`, open with `?kids` or the 🎈 Kids Mode button on the splash).
 
 Verified in headless Chromium at iPad sizes (1180×820 landscape, 820×1180 portrait):
 - all 16 instruments load with no missing samples
@@ -232,5 +252,10 @@ Verified in headless Chromium at iPad sizes (1180×820 landscape, 820×1180 port
 - silent-switch behavior
 - speech on iOS
 
-Known gaps carried into Phase 1+: CDN samples (self-host + license check), Google-font dependency (bundle it),
-balloons reuse vibe hues (should get a neutral palette), and pattern content is one variant per role × vibe.
+Automated suite (46 checks, production build): first-run flow, glow guidance, spoken prompts, note lights for every
+slot, dial taps, swap/mute/remove, crown hand-off, all song-level controls, tapes save/load/hold-delete,
+returning visitor, corrupt storage, age tiers, grown-up exit, and layout + touch-target checks at iPad mini,
+iPad Air portrait and landscape, iPad Pro 13, and phone. Instrument loudness is measured solo across all 6 vibes.
+
+Known gaps carried into Phase 1+: samples still load from CDNs (self-host + license check), and pattern content
+is one variant per role × vibe.
