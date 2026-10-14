@@ -73,7 +73,15 @@ Stored locally only. A grown-up can change it behind the parent gate.
 | 🌱 Seedling | 3–4 | 3 | 8 instruments | ☀️/🌙 flip only | mute, remove |
 | 🌿 Sprout | 5–6 | 4 | 12 | + key tiles, + 🐢/🐇 tempo | + loud/quiet |
 | 🌳 Bloom | 7+ | 6 | all | + 3/4 ↔ 4/4 rocker, + 🎲 surprise | + low/mid/high octave |
-| (next phase) | 7+ | | | + chord train (number blocks 1–6) | |
+| (next phase) 🎛️ | 9+ | 6 | all | + chord sequencer | |
+| (later, maybe) | 5–8 | | | + simple chord train (2–3 cars, blocks 1/4/5) | |
+
+**Decided 2026-10-14:** 9-year-olds tend to reject anything that looks babyish, so the 9+ tier gets a
+**chord sequencer**, not a train. It's a row of 4 glowing pads with a sweeping playhead. Tap a pad to cycle
+its chord, or drag numbered tiles onto it. Pads are letter-colored like the key bells and labeled with the
+number and the real chord name ("1 · C", "5 · G"). It also has "famous progression" presets (1-5-6-4 and
+friends). The train metaphor may come back later as a simpler version for 5–8, so the idea grows up with
+the child. Until 9+ has the sequencer, the 7, 8 and 9+ balloons give the same app.
 
 Tiers are data (`ageTiers.js`), so tuning them is a one-line change.
 
@@ -176,7 +184,7 @@ Kids will max everything, so the limiter is mandatory.
 | 2 — Patterns | Full library: 6 vibes × roles × 2 meters × 2 variants, complement generator tuning | Every dial position on every instrument is a "yes" |
 | 3 — Save + profiles | Emoji names, tape shelf, profiles | |
 | 4 — iPad app | Capacitor shell, audio session, parent gate, icons, TestFlight | Installed on a real iPad |
-| 5 — Chord train | Number blocks 1–6 → train cars, letter-colored by key | |
+| 5 — Chord sequencer (9+) | 4 letter-colored pads, number + chord name, presets; train version for 5–8 later | |
 | 6 — Polish | Recorded voice prompts, haptics, accessibility audit | |
 
 ---
