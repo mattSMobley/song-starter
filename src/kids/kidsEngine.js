@@ -11,9 +11,9 @@ const LOOKAHEAD = 0.15
 const TICK_MS   = 20
 const MAX_SLOTS = 6
 const VOLUMES   = [0.35, 0.7, 1]
-const ROLE_RELEASE = { bass: 0.4, comp: 0.8, melody: 0.5, sparkle: 1.2, pad: 1.6 }
+const ROLE_RELEASE = { bass: 0.4, riff: 0.35, comp: 0.8, melody: 0.5, sparkle: 1.2, pad: 1.6 }
 // Roles whose sustained notes count as "busy" when a complement looks for gaps
-const HOLD_IS_BUSY = new Set(['bass', 'comp', 'melody', 'sparkle'])
+const HOLD_IS_BUSY = new Set(['bass', 'riff', 'comp', 'melody', 'sparkle'])
 
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
   (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1)

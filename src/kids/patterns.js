@@ -9,6 +9,8 @@
 //   x      full chord (instrument voicing, default root/3rd/5th)
 // A string may be 1 bar or 2 bars long; it loops.
 //
+// riff = electric guitar: single picked notes, a hookier line than melody.
+//
 // Drum patterns: one string per hit type, x = hit, g = ghost (soft).
 //   k kick · s snare · h hat · o open hat · t tom-hi · T tom-lo
 //
@@ -23,6 +25,7 @@ export const PATTERNS = {
       bass:    '0.0.0.0.0.0.0.0.',
       comp:    'x--.x--.x--.x-x.',
       melody:  '4-..4-..5-4-2-..0-..2-..4-----..',
+      riff:    '0.0.4.0.0.5.4.2.0.0.4.0.7.5.4.2.',
       sparkle: '7.4.7.4.7.4.7.4.',
       pad:     'x---------------',
     },
@@ -31,6 +34,8 @@ export const PATTERNS = {
       bass:    '0.0.0.0.0.0.',
       comp:    'x--.x--.x--.',
       melody:  '4-..4-..5-4-2-..0-------',
+      riff:    '0---4---7---9---7---4---',
+      riff:    '0.0.4.0.5.4.0.0.4.7.5.4.',
       sparkle: '7.4.7.4.7.4.',
       pad:     'x-----------',
     },
@@ -43,6 +48,9 @@ export const PATTERNS = {
       bass:    '0..7..0...7.0.4.',
       comp:    '.x...x..x.x...x.',
       melody:  '4.2.4..5.4.2..0.2.4..5.7...4.2..',
+      riff:    '0---4---7---9---7---4---2---4---',
+      riff:    '0...2.4...4.2.0.0...2.4...7.5.4.',
+      riff:    '0..0..7.0..4.5..0..0..7.9.7.4.2.',
       sparkle: '..7...4...7...9.',
       pad:     'x-------x-------',
     },
@@ -51,6 +59,8 @@ export const PATTERNS = {
       bass:    '0..7..0.L.4.',
       comp:    '.x...x..x.x.',
       melody:  '4.2.4..5.4..2.4..5.7.4..',
+      riff:    '0...2.4.2.0.0...2.4.5.4.',
+      riff:    '0..0..7.4.2.0..0..7.9.7.',
       sparkle: '..7...4...9.',
       pad:     'x-----x-----',
     },
@@ -63,6 +73,7 @@ export const PATTERNS = {
       bass:    '0-..0-..0-..4-2-',
       comp:    'x.x.x.x.x.x.x.x.',
       melody:  '0-2-4---4-5-4-2-2-4-2-0---------',
+      riff:    '0.4.7.4.0.4.7.4.0.4.7.9.7.4.2.4.',
       sparkle: '0.4.7.9.7.4.0.4.',
       pad:     'x---------------',
     },
@@ -71,6 +82,7 @@ export const PATTERNS = {
       bass:    '0-..4-..2-..',
       comp:    '....x...x...',
       melody:  '0-2-4---4-5-4-2-0-------',
+      riff:    '0.4.7.4.7.4.0.4.7.9.7.4.',
       sparkle: '0.4.7.9.7.4.',
       pad:     'x-----------',
     },
@@ -123,6 +135,7 @@ export const PATTERNS = {
       bass:    '0.0..L..0.0..2.1',
       comp:    'x...x...x..x.x..',
       melody:  '4...5...4.2.1...0...L...0.......',
+      riff:    '0..1..0.L...0.1.0..1..4.3.2.1...',
       sparkle: '7.....6.7.....4.',
       pad:     'x---------------',
     },
@@ -131,6 +144,7 @@ export const PATTERNS = {
       bass:    '0.0..L..0.1.',
       comp:    'x...x...x.x.',
       melody:  '4...5...4.2.1...0...L...',
+      riff:    '0..1..0.L...0..1..4.3.2.',
       sparkle: '7.....6.7...',
       pad:     'x-----------',
     },

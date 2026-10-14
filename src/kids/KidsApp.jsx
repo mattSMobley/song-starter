@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import './kids.css'
 import * as engine from './kidsEngine.js'
 import { INSTRUMENTS, instById } from './instruments.js'
+import { InstIcon } from './InstrumentArt.jsx'
 import { TIERS, tierForAge, VIBES, KEYS } from './theory.js'
 import VibeDial from './VibeDial.jsx'
 import { ModeFlip, KeyBells, TempoLever, MeterRocker } from './SongControls.jsx'
@@ -293,7 +294,7 @@ export default function KidsApp() {
                   className={`slot-icon ${s && loaded[i] === false ? 'loading' : ''}`}
                   aria-label={s ? inst.id : 'empty'}
                   onClick={() => setSelected(selected === i ? null : i)}>
-                  {s ? (s.muted ? '😴' : inst.icon) : '+'}
+                  {s ? <><InstIcon inst={inst} />{s.muted && <span className="zzz">😴</span>}</> : '+'}
                 </button>
                 {s && (
                   <VibeDial vibe={s.vibe} glow={guide.dial === i}
@@ -350,7 +351,7 @@ export default function KidsApp() {
       <footer className={`bank ${guide.bank ? `glow-${guide.bank}` : ''}`}>
         {INSTRUMENTS.slice(0, tier.bankSize).map(inst => (
           <button key={inst.id} className="bank-btn" aria-label={inst.id} onClick={() => addInstrument(inst.id)}>
-            {inst.icon}
+            <InstIcon inst={inst} />
           </button>
         ))}
       </footer>

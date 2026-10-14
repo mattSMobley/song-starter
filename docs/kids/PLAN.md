@@ -114,12 +114,15 @@ Tiers are data (`ageTiers.js`), so tuning them is a one-line change.
 **Phase 0** uses CDN samples (MusyngKite soundfont + Salamander + the local drum kits).
 **Phase 1** self-hosts and curates everything (offline, no CDN dependency, App Store-safe).
 
-Kid roster: Piano, Xylophone, Marimba, Glockenspiel, Music Box, Kalimba, Steel Drum,
-Acoustic Guitar, Banjo, Bass, Drums, Violin, Pizzicato, Trumpet, Flute, Choir "ooh".
+Kid roster, in bank order (user, 2026-10-14): Drums, Piano, Acoustic Guitar, Electric Guitar, Bass, Violin,
+Trumpet, Alto Sax (replaced Flute), then Xylophone, Marimba, Music Box, Steel Drum, Choir "ooh", Banjo,
+Glockenspiel, Kalimba, Strings.
+**Pictures teach the instrument:** where no emoji shows the real instrument, it's a drawing
+(`InstrumentArt.jsx`). No stand-ins like 🌈 for xylophone or 🐋 for bass.
 Later: ukulele, claps, shakers (need new sources).
 
 **Roles:** every instrument has a role that decides its patterns.
-`beat` (drums) · `bass` · `comp` (strum/chords) · `melody` · `sparkle` (high bell figures) · `pad` (long notes).
+`beat` (drums) · `bass` · `comp` (strum/chords) · `riff` (electric guitar picking) · `melody` · `sparkle` (high bell figures) · `pad` (long notes).
 Two instruments with the same role → the second plays the alternate variant, an octave up.
 
 **Mix:** per-slot channel (volume, mute) → shared bus → one reverb (ConvolverNode with
@@ -239,7 +242,7 @@ Kids will max everything, so the limiter is mandatory.
 **Phase 0 + saving are built and deployed** (`src/kids/`, open with `?kids` or the 🎈 Kids Mode button on the splash).
 
 Verified in headless Chromium at iPad sizes (1180×820 landscape, 820×1180 portrait):
-- all 16 instruments load with no missing samples
+- all 17 instruments load with no missing samples
 - note lights fire per slot
 - tiers gate the controls correctly (3 → 3 slots / 8 instruments / ☀️🌙 only; 9+ → everything)
 - 3/4 switches at the bar line
