@@ -123,7 +123,7 @@ Tiers are data (`ageTiers.js`), so tuning them is a one-line change.
 **Phase 1** self-hosts and curates everything (offline, no CDN dependency, App Store-safe).
 
 Kid roster, in bank order (user, 2026-10-14): Drums, Piano, Acoustic Guitar, Electric Guitar, Bass, Violin,
-Trumpet, Alto Sax (replaced Flute), then Xylophone, Marimba, Music Box, Steel Drum, Choir "ooh", Banjo,
+Trumpet, Tenor Sax (replaced Flute; an octave under the trumpet so they sound different), then Xylophone, Marimba, Music Box, Steel Drum, Choir "ooh", Banjo,
 Glockenspiel, Kalimba, Strings.
 **Pictures teach the instrument:** where no emoji shows the real instrument, it's a drawing
 (`InstrumentArt.jsx`). No stand-ins like 🌈 for xylophone or 🐋 for bass.

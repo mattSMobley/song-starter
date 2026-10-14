@@ -3,6 +3,8 @@ import './kids.css'
 import * as engine from './kidsEngine.js'
 import { INSTRUMENTS, instById } from './instruments.js'
 import { InstIcon } from './InstrumentArt.jsx'
+import VoicePicker from './VoicePicker.jsx'
+import { speak } from './voice.js'
 import { TIERS, tierForAge, VIBES, KEYS } from './theory.js'
 import VibeDial from './VibeDial.jsx'
 import { ModeFlip, KeyBells, TempoLever, MeterRocker } from './SongControls.jsx'
@@ -43,12 +45,6 @@ function cleanSong(raw) {
 }
 
 // Pick a friendly voice when one exists (iPad: Samantha), else the default
-function pickVoice() {
-  const voices = window.speechSynthesis?.getVoices?.() ?? []
-  return ['Samantha', 'Karen', 'Moira', 'Google US English'].map(n => voices.find(v => v.name.startsWith(n))).find(Boolean)
-    ?? voices.find(v => v.lang?.startsWith('en'))
-}
-
 export default function KidsApp() {
   const [age, setAge]           = useState(() => load('kids_age', null))
   const [screen, setScreen]     = useState('gate')       // gate | play
@@ -60,6 +56,8 @@ export default function KidsApp() {
   const [playing, setPlaying]   = useState(false)
   const [loaded, setLoaded]     = useState([])
   const [voiceOn, setVoiceOn]   = useState(() => load('kids_voice', true))
+  const [voiceName, setVoiceName] = useState(() => load('kids_voice_name', null))
+  const [voiceOpen, setVoiceOpen] = useState(false)
   const [idle, setIdle]         = useState(false)
   const [wiggle, setWiggle]     = useState(false)
   const [pickingAge, setPickingAge] = useState(false)
@@ -99,14 +97,8 @@ export default function KidsApp() {
   const say = useCallback((id, text) => {
     if (!voiceOn || spoken.current.has(id) || !window.speechSynthesis) return
     spoken.current.add(id)
-    const u = new SpeechSynthesisUtterance(text)
-    const voice = pickVoice()
-    if (voice) u.voice = voice
-    u.rate = 0.95
-    u.pitch = 1.25
-    window.speechSynthesis.cancel()
-    window.speechSynthesis.speak(u)
-  }, [voiceOn])
+    speak(text, voiceName)
+  }, [voiceOn, voiceName])
 
   // ── Idle wink: after 15 s of no touches, nudge the mood switch ─────────────
   const idleTimer = useRef(null)
@@ -359,13 +351,21 @@ export default function KidsApp() {
       {/* ── Grown-up corner ── */}
       <div className="corner-tools">
         {tier.meter && <MeterRocker meter={song.meter} onChange={meter => setSong(s => ({ ...s, meter }))} />}
-        <button className="tool" onClick={() => { save('kids_voice', !voiceOn); setVoiceOn(!voiceOn) }}>
+        <button className="tool" aria-label="voice" onClick={() => setVoiceOpen(true)}>
           {voiceOn ? '🗣️' : '🤫'}
         </button>
         <button className="tool" onClick={() => { setPickingAge(true); setScreen('gate') }}>🎂</button>
         <HoldButton onHold={() => { engine.stop(); window.location.href = window.location.pathname }}>🏠</HoldButton>
       </div>
       </div>
+
+      {voiceOpen && (
+        <VoicePicker voiceOn={voiceOn} voiceName={voiceName} onClose={() => setVoiceOpen(false)}
+          onChange={v => {
+            setVoiceOn(v.voiceOn); save('kids_voice', v.voiceOn)
+            setVoiceName(v.voiceName); save('kids_voice_name', v.voiceName)
+          }} />
+      )}
 
       {deckOpen && (
         <TapeDeck tapes={tapes} song={song} canSave={filled.length > 0}
