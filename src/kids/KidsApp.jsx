@@ -272,24 +272,18 @@ export default function KidsApp() {
           {pickingAge && age && audioOn && (
             <button className="gate-back" aria-label="back" onClick={() => { setPickingAge(false); setScreen('play') }}>↩</button>
           )}
-          {age && !pickingAge ? (
-            <>
-              <button className="big-start" onClick={() => begin(null)}>▶</button>
-              <button className="gate-age" onClick={() => setPickingAge(true)}>🎂 {age}</button>
-            </>
-          ) : (
-            <>
-              <div className="gate-cake">🎂</div>
-              <div className="balloons">
-                {AGES.map((a, i) => (
-                  <button key={a} className="balloon" style={{ '--b': BALLOONS[i], animationDelay: `${i * 0.15}s` }}
-                    onClick={() => pickAge(a)}>
-                    {a === 9 ? '9+' : a}
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
+          {/* Every visit starts here: the age picks the tier, and tapping a balloon is the tap that starts audio */}
+          <div className="gate-cake">🎂</div>
+          <h1 className="gate-ask">How old are you?</h1>
+          <div className="balloons">
+            {AGES.map((a, i) => (
+              <button key={a} className={`balloon ${a === age ? 'last' : ''}`}
+                style={{ '--b': BALLOONS[i], animationDelay: `${i * 0.15}s` }}
+                onClick={() => pickAge(a)}>
+                {a === 9 ? '9+' : a}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     )

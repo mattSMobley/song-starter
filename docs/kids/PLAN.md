@@ -64,7 +64,7 @@ If the leader is removed, the crown hops to the next slot.
 
 ## 4. Age tiers
 
-On first launch: "How old are you?" with big number balloons (3 4 5 6 7 8 9+).
+Every visit opens on "How old are you?" (cake + the words, for pre-readers and early readers) with big number balloons (3 4 5 6 7 8 9+). Last time's balloon glows, and picking an age resumes the saved song.
 Tapping one pops that many balloons with that many notes, so kids count along.
 Stored locally only. A grown-up can change it behind the parent gate.
 

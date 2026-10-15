@@ -49,10 +49,18 @@
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 40px;
 }
 .gate-cake { font-size: 96px; animation: bob 2.4s ease-in-out infinite; }
+/* Big, plain words for early readers; pre-readers still get the cake */
+.gate-ask { margin-top: -24px; font-size: clamp(30px, 6vw, 46px); letter-spacing: 0.01em; text-shadow: 0 3px 0 rgba(0,0,0,0.25); }
+/* Last time's balloon glows a little, so a returning kid spots theirs */
+.balloon.last { box-shadow: inset -8px -10px 0 rgba(0,0,0,0.12), 0 0 0 5px rgba(255,255,255,0.7), 0 0 34px var(--b); }
 .balloons { display: flex; flex-wrap: wrap; justify-content: center; gap: 22px; max-width: 900px; }
 /* All 7 in one row when they fit; otherwise 4 + 3, never a lonely 9+ on its own row */
 @media (max-width: 899px) { .balloons { max-width: 480px; } }
 @media (max-width: 600px) {
+  .gate { gap: 28px; }
+  .kids-root > .gate { flex: 1 0 auto; }   /* the phone layout is a column; keep the age screen centered */
+  .gate-cake { font-size: 72px; }
+  .gate-ask { margin-top: -16px; }
   .balloons { max-width: 340px; gap: 14px; }
   .balloon { width: 72px !important; height: 88px !important; font-size: 34px !important; }
 }
@@ -70,15 +78,7 @@
   background: rgba(255,255,255,0.4);
 }
 .balloon:active { transform: scale(0.9); }
-.big-start {
-  width: 200px; height: 200px; border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #9cffc8, #22c55e 60%, #15803d);
-  box-shadow: 0 0 0 10px rgba(34,197,94,0.25), 0 0 60px rgba(34,197,94,0.6), inset 0 -10px 0 rgba(0,0,0,0.18);
-  font-size: 84px; padding-left: 16px;
-  animation: breathe 1.8s ease-in-out infinite;
-}
 .gate-back { position: absolute; top: max(18px, env(safe-area-inset-top)); left: max(18px, env(safe-area-inset-left)); width: 64px; height: 64px; border-radius: 20px; font-size: 30px; background: var(--panel); }
-.gate-age { font-size: 28px; padding: 10px 22px; border-radius: 999px; background: var(--panel); }
 
 /* ── Song bar ───────────────────────────────────────────────────────────── */
 .song-bar {
