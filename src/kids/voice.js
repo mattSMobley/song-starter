@@ -50,9 +50,45 @@ export function voiceLabel(v) {
   return /premium|enhanced/i.test(v.name) ? `${base} ✨` : base
 }
 
+// Chrome only starts loading voices on the first getVoices() call and returns []
+// until 'voiceschanged' fires. Speaking in that window uses the browser's default
+// voice, so prompts came out in two different voices. Load them up front, and
+// hold an early prompt until they arrive.
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+  (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1)
+let pending = null, pendingTimer = null
+
+function flushPending() {
+  if (!pending || !englishVoices().length) return
+  const { text, voiceName } = pending
+  pending = null
+  clearTimeout(pendingTimer)
+  say(text, voiceName)
+}
+
+if (typeof window !== 'undefined' && window.speechSynthesis) {
+  window.speechSynthesis.getVoices()
+  window.speechSynthesis.addEventListener?.('voiceschanged', flushPending)
+}
+
 export function speak(text, voiceName) {
+  if (!window.speechSynthesis) return
+  // iOS only lets speech start inside the tap, so never defer there (its voices are ready at once anyway)
+  if (!englishVoices().length && !isIOS) {
+    pending = { text, voiceName }
+    clearTimeout(pendingTimer)
+    pendingTimer = setTimeout(() => {   // voices never came: better the default voice than silence
+      const p = pending
+      pending = null
+      if (p) say(p.text, p.voiceName)
+    }, 2000)
+    return
+  }
+  say(text, voiceName)
+}
+
+function say(text, voiceName) {
   const synth = window.speechSynthesis
-  if (!synth) return
   try {   // speech is a nice-to-have; it must never break the tap that triggered it
     const u = new SpeechSynthesisUtterance(text)
     const v = findVoice(voiceName)
