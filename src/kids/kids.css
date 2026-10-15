@@ -485,6 +485,38 @@
 }
 
 /* ── Motion ─────────────────────────────────────────────────────────────── */
+/* ── Show-don't-tell hand (TapHint.jsx) ─────────────────────────────────── */
+.tap-hint { position: fixed; z-index: 30; width: 0; height: 0; pointer-events: none; }
+.tap-hand {
+  position: absolute; left: -24px; top: -4px;   /* fingertip on the target's center */
+  font-size: 64px; line-height: 1; transform-origin: 40% 0;
+  filter: drop-shadow(0 6px 10px rgba(0,0,0,0.45));
+  animation: tapHand 3.2s ease-in-out forwards;
+}
+.tap-ring {
+  position: absolute; left: -36px; top: -36px; width: 72px; height: 72px; border-radius: 50%;
+  border: 4px solid rgba(255,255,255,0.9); opacity: 0;
+  animation: tapRing 0.7s ease-out 0.95s;
+}
+.tap-ring.r2 { animation-delay: 1.75s; }
+@keyframes tapHand {
+  0%   { opacity: 0; transform: translate(40px, 60px); }
+  20%  { opacity: 1; transform: translate(0, 0) scale(1); }
+  30%  { transform: translate(0, 0) scale(0.86); }
+  40%  { transform: translate(0, 0) scale(1); }
+  55%  { transform: translate(0, 0) scale(0.86); }
+  65%  { transform: translate(0, 0) scale(1); }
+  85%  { opacity: 1; transform: translate(0, 0); }
+  100% { opacity: 0; transform: translate(20px, 30px); }
+}
+@keyframes tapRing { 0% { opacity: 0.9; transform: scale(0.3); } 100% { opacity: 0; transform: scale(1.5); } }
+@media (prefers-reduced-motion: reduce) {
+  /* beats the global 0.01ms rule below: the hand still shows, it just fades instead of flying */
+  .kids-root .tap-hand { animation: tapHandStill 3.2s ease-in-out forwards !important; }
+  .tap-ring { display: none; }
+}
+@keyframes tapHandStill { 0%, 100% { opacity: 0; } 15%, 85% { opacity: 1; } }
+
 @keyframes bob { 0%, 100% { translate: 0 0; } 50% { translate: 0 -6px; } }
 @keyframes breathe { 0%, 100% { scale: 1; } 50% { scale: 1.06; } }
 @keyframes spin { to { transform: rotate(360deg); } }

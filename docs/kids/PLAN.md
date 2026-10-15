@@ -122,9 +122,11 @@ Tiers are data (`ageTiers.js`), so tuning them is a one-line change.
 - 💃 3 / 🚶 4 rocker: small, in a corner. Takes effect at the next bar line.
 
 **Glow guidance** (state machine, suggests and never blocks)
-`no slots` → bank glows → `slot added, dial untouched` → that dial glows → `≥1 dial turned` → next empty slot + bank glow softly → after ~20 s idle, a song-bar control winks.
+`no slots` → bank glows → `slot added, dial untouched` → that dial glows → `≥1 dial turned` → next empty slot + bank glow softly → after ~10 s still on a glowing step, a silent 👆 hand flies over and pretend-taps it (max 3 times per step; any touch hides it). With nothing left to do, the ☀️/🌙 switch winks when idle.
 
-**Spoken prompts** (optional, parent toggle): "Pick an instrument!", "Turn the dial!", "Happy… or sad?" Phase 0 uses `speechSynthesis`; later, a recorded friendly voice.
+**Show, don't tell (decided 2026-10-15):** no "?" help button for young kids. "?" is a convention pre-readers don't know, and help text needs reading. The hand demo is the help.
+
+**Spoken prompts** (🗣️ picker; default a British male voice). **Rule:** speak only right after the kid does something, only about the very next step, and only while that step glows. Each line plays once per device; after that the hand does the reminding. Lines: "Pick an instrument!" (age picked, empty board), "Turn the dial!" (first instrument), "Pick another one!" (first dial turn), "Pick stickers for your song!" (📼 opened), "Pick a number!" (9+, first chord pad). "Happy… or sad?" was removed: it fired on idle, out of context. Later: a recorded friendly voice.
 
 ---
 
@@ -258,6 +260,8 @@ Kids will max everything, so the limiter is mandatory.
 | 40 | Octave buttons ✕ ■ ● meant nothing to kids | 🐘 low · 🐱 middle · 🐤 high |
 | 41 | 9+ balloon alone on a second row | 7 in a row when they fit, otherwise 4 + 3 |
 | 42 | 🎂 in-app was one tap from changing the whole app; no way back from the age screen | 🎂 is hold-to-open like 🏠; ↩ returns without changing anything |
+| 44 | Idle "Happy… or sad?" came out of nowhere | Removed; speech only follows the kid's own action, once per device; the silent 👆 hand replaces idle prompts |
+| 45 | A previous kid's key / 🎲 roll carried into a new song | Empty board → new song starts on C, happy, 4/4, normal speed; a song still on the board keeps its key |
 | 43 | Double-tap on start built the audio graph twice; a failed download left an icon pulsing forever | Start is idempotent; failed instrument / drum loads retry on their own |
 
 **Saving (Phase 3, pulled forward):** 📼 opens the Tape Deck. Kids name a song with up to 3 stickers (plus an optional grown-up text name). Tapes are colored by key and show ☀️/🌙. Tap a tape to load it; hold 🗑️ for 1 s to delete. The 📼 glows once a song is built and nothing has been saved. Stored locally (max 40).

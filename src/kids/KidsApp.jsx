@@ -10,6 +10,7 @@ import VibeDial from './VibeDial.jsx'
 import { ModeFlip, KeyBells, TempoLever, MeterRocker } from './SongControls.jsx'
 import TapeDeck from './TapeDeck.jsx'
 import ChordStrip from './ChordStrip.jsx'
+import TapHint from './TapHint.jsx'
 
 const MAX_SLOTS = 6
 const AGES = [3, 4, 5, 6, 7, 8, 9]
@@ -75,7 +76,7 @@ export default function KidsApp() {
 
   const iconRefs = useRef([])
   const beatRefs = useRef([])
-  const spoken   = useRef(new Set())
+  const spoken   = useRef(new Set(load('kids_spoken', [])))
 
   // ── Persist + sync engine ──────────────────────────────────────────────────
   useEffect(() => { save('kids_slots', slots); engine.setSlots(slots.map((s, i) => (i < n ? s : null))) }, [slots, n])
@@ -98,10 +99,14 @@ export default function KidsApp() {
   useEffect(() => engine.onBeat(b => pulse(beatRefs.current[b])), [])
   useEffect(() => engine.onBar(setChordNow), [])
 
-  // ── Spoken prompts (each one once per session) ─────────────────────────────
+  // ── Spoken prompts ─────────────────────────────────────────────────────────
+  // Rule: speak only right after the kid does something, only about the very
+  // next step, and only while that step is glowing. Each line once per device;
+  // after that the silent 👆 hand (TapHint) does the reminding.
   const say = useCallback((id, text) => {
     if (!voiceOn || spoken.current.has(id) || !window.speechSynthesis) return
     spoken.current.add(id)
+    save('kids_spoken', [...spoken.current])
     speak(text, voiceName)
   }, [voiceOn, voiceName])
 
@@ -114,12 +119,18 @@ export default function KidsApp() {
   }, [])
   useEffect(() => () => clearTimeout(idleTimer.current), [])
   useEffect(() => { if (idle) setSelected(null) }, [idle])   // a forgotten selection would turn the next bank tap into a swap
-  useEffect(() => { if (idle && playing) say('mood', 'Happy… or sad?') }, [idle, playing, say])
 
   // ── Start / age ────────────────────────────────────────────────────────────
+  // A new song (empty board) always starts on C, happy, 4/4, normal speed, so one
+  // kid's key or 🎲 roll doesn't carry over. A song still on the board keeps its key.
+  function freshSongIfEmpty() {
+    if (!slots.some(Boolean)) setSong({ ...DEFAULT_SONG })
+  }
+
   async function begin(pickedAge) {
     const init = engine.initKidsAudio()   // must start inside the tap (iOS)
     const resume = active.some(Boolean)
+    freshSongIfEmpty()
     if (!resume) say('pick', 'Pick an instrument!')   // iOS only allows speech inside the tap too
     if (pickedAge) {
       setAge(pickedAge)
@@ -139,6 +150,7 @@ export default function KidsApp() {
     if (!audioOn) return begin(a)
     setAge(a)
     save('kids_age', a)
+    freshSongIfEmpty()
     for (let k = 0; k < a; k++) setTimeout(() => engine.blip(k), 140 * k)
     setScreen('play')
   }
@@ -264,6 +276,16 @@ export default function KidsApp() {
   if (filled.length >= 2 && !untouched.length && !tapes.length) guide.tape = true
   if (tier.chords && filled.length >= 2 && !untouched.length && !chordsTouched) guide.chords = true
 
+  // What the 👆 hand demonstrates when the kid sits still: the glowing next step
+  const hintTarget = guide.dial != null
+    ? { key: `dial-${active[guide.dial].uid}`,
+        find: () => document.querySelectorAll(`[data-slot="${guide.dial}"] .gem`)[(active[guide.dial].vibe + 1) % 6] }
+    : guide.bank
+      ? { key: `bank-${filled.length}`, find: firstVisibleBankButton }
+      : guide.chords
+        ? { key: 'chords', find: () => document.querySelector('.cs-pad') }
+        : null
+
   // ── Screens ────────────────────────────────────────────────────────────────
   if (screen === 'gate') {
     return (
@@ -295,7 +317,7 @@ export default function KidsApp() {
     <div className={`kids-root ${song.mode} ${tier.chords ? 'with-chords' : ''}`} onPointerDownCapture={poke}>
       {/* ── Song bar ── */}
       <header className="song-bar">
-        <ModeFlip mode={song.mode} glow={idle && playing}
+        <ModeFlip mode={song.mode} glow={idle && playing && !hintTarget}
           onChange={mode => setSong(s => ({ ...s, mode }))} />
         {tier.keys && <KeyBells value={song.key} onChange={key => setSong(s => ({ ...s, key }))} />}
         {tier.tempo && <TempoLever value={song.tempoScale} onChange={tempoScale => setSong(s => ({ ...s, tempoScale }))} />}
@@ -316,7 +338,7 @@ export default function KidsApp() {
             const inst = s && instById(s.inst)
             const vibe = s ? VIBES[s.vibe] : null
             return (
-              <div key={i}
+              <div key={i} data-slot={i}
                 className={`slot ${s ? 'filled' : 'empty'} ${selected === i ? 'selected' : ''} ${guide.slot === i ? 'glow' : ''} ${s?.muted ? 'muted' : ''}`}
                 style={vibe ? { '--vibe': vibe.hue, '--vibe-glow': vibe.glow } : undefined}>
                 {i === leaderIdx && <span className="crown">👑</span>}
@@ -398,6 +420,8 @@ export default function KidsApp() {
       </div>
       </div>
 
+      <TapHint target={hintTarget} paused={voiceOpen || deckOpen} />
+
       {voiceOpen && (
         <VoicePicker voiceOn={voiceOn} voiceName={voiceName} onClose={() => setVoiceOpen(false)}
           onChange={v => {
@@ -413,6 +437,17 @@ export default function KidsApp() {
       )}
     </div>
   )
+}
+
+// The bank scrolls sideways; point at an instrument that's actually on screen
+function firstVisibleBankButton() {
+  const bank = document.querySelector('.bank')
+  if (!bank) return null
+  const b = bank.getBoundingClientRect()
+  return [...bank.querySelectorAll('.bank-btn')].find(el => {
+    const r = el.getBoundingClientRect()
+    return r.left >= b.left - 1 && r.right <= b.right + 1
+  })
 }
 
 function pulse(el) {
