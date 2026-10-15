@@ -353,12 +353,12 @@ export default function App() {
               ))}
             </div>
           </div>
-          <div className="reveal-up flex flex-wrap justify-center gap-2" style={{ animationDelay: '0.32s', maxWidth: 520 }}>
+          {/* Plain labels, not pills — they're info, and pill shapes read as tappable buttons */}
+          <div className="reveal-up flex flex-wrap justify-center" style={{ animationDelay: '0.32s', maxWidth: 520, columnGap: 'clamp(12px, 4vw, 22px)', rowGap: 6 }}>
             {FEATURES.map(f => (
-              <div key={f.label} className="flex items-center gap-2 rounded-full"
-                style={{ padding: '8px 18px', background: 'rgba(20,14,36,0.85)', border: '1px solid rgba(124,58,237,0.35)', boxShadow: '0 0 12px rgba(124,58,237,0.12), inset 0 1px 0 rgba(255,255,255,0.06)', backdropFilter: 'blur(8px)' }}>
-                <span style={{ fontSize: 14 }}>{f.icon}</span>
-                <span style={{ fontSize: '0.72rem', color: 'rgba(196,181,253,0.8)', fontWeight: 500, letterSpacing: '0.03em' }}>{f.label}</span>
+              <div key={f.label} className="flex items-center" style={{ gap: 6, cursor: 'default' }}>
+                <span style={{ fontSize: 'clamp(11px, 3.2vw, 13px)', opacity: 0.85 }}>{f.icon}</span>
+                <span style={{ fontSize: 'clamp(0.64rem, 2.8vw, 0.72rem)', color: 'rgba(196,181,253,0.7)', fontWeight: 500, letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>{f.label}</span>
               </div>
             ))}
           </div>
@@ -375,11 +375,11 @@ export default function App() {
             style={{ animationDelay: '0.5s', padding: '10px 22px', background: 'linear-gradient(90deg, #ef4444, #f97316, #facc15, #4ade80, #14b8a6, #a855f7)', color: '#fff', fontWeight: 700, fontSize: '0.95rem', textShadow: '0 1px 2px rgba(0,0,0,0.4)', textDecoration: 'none' }}>
             🎈 Kids Mode
           </a>
-          <div className="reveal-up flex items-center gap-4" style={{ animationDelay: '0.56s' }}>
+          <div className="reveal-up flex items-center" style={{ animationDelay: '0.56s', gap: 'clamp(8px, 3vw, 16px)' }}>
             {['No account needed', 'Works offline', '100% in-browser'].map((t, i) => (
-              <span key={t} className="flex items-center gap-4">
+              <span key={t} className="flex items-center" style={{ gap: 'clamp(8px, 3vw, 16px)' }}>
                 {i > 0 && <span style={{ color: 'rgba(71,85,105,0.35)', fontSize: 10 }}>·</span>}
-                <span style={{ color: 'rgba(100,116,139,0.55)', fontSize: '0.7rem', letterSpacing: '0.05em' }}>{t}</span>
+                <span style={{ color: 'rgba(100,116,139,0.55)', fontSize: 'clamp(0.6rem, 2.6vw, 0.7rem)', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>{t}</span>
               </span>
             ))}
           </div>
