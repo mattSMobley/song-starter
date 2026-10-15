@@ -253,6 +253,12 @@ Kids will max everything, so the limiter is mandatory.
 | 35 | Phone layout overlapped / tiny key bells | Phone layout is a scrolling column; all targets ≥44 px |
 | 36 | Balloons reused vibe colors | Neutral pastel palette |
 | 37 | Pinch / double-tap zoom on iPad | Blocked in kids mode |
+| 38 | Electric guitar crashed the music on 🟢/🔵 (riffs inserted into the wrong vibes); the play button then showed ⏸ over silence | Riffs fixed; a pattern validator checks every role × vibe × meter; one bad slot is now skipped, never the whole scheduler |
+| 39 | 🧩 complement went silent under legato leaders (no gaps) | Complement answers between the leader's note *starts*; all 204 instrument × vibe × meter combos verified to play |
+| 40 | Octave buttons ✕ ■ ● meant nothing to kids | 🐘 low · 🐱 middle · 🐤 high |
+| 41 | 9+ balloon alone on a second row | 7 in a row when they fit, otherwise 4 + 3 |
+| 42 | 🎂 in-app was one tap from changing the whole app; no way back from the age screen | 🎂 is hold-to-open like 🏠; ↩ returns without changing anything |
+| 43 | Double-tap on start built the audio graph twice; a failed download left an icon pulsing forever | Start is idempotent; failed instrument / drum loads retry on their own |
 
 **Saving (Phase 3, pulled forward):** 📼 opens the Tape Deck. Kids name a song with up to 3 stickers (plus an optional grown-up text name). Tapes are colored by key and show ☀️/🌙. Tap a tape to load it; hold 🗑️ for 1 s to delete. The 📼 glows once a song is built and nothing has been saved. Stored locally (max 40).
 

@@ -12,8 +12,6 @@ const TICK_MS   = 20
 const MAX_SLOTS = 6
 const VOLUMES   = [0.35, 0.7, 1]
 const ROLE_RELEASE = { bass: 0.4, riff: 0.35, comp: 0.8, melody: 0.5, sparkle: 1.2, pad: 1.6 }
-// Roles whose sustained notes count as "busy" when a complement looks for gaps
-const HOLD_IS_BUSY = new Set(['bass', 'riff', 'comp', 'melody', 'sparkle'])
 
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
   (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1)
@@ -39,8 +37,13 @@ export const onBar = cb => (barListeners.add(cb), () => barListeners.delete(cb))
 export const onLoadChange = cb => (loadListeners.add(cb), () => loadListeners.delete(cb))
 
 // ── Audio graph ──────────────────────────────────────────────────────────────
-export async function initKidsAudio() {
-  if (ready) return
+let initPromise = null
+export function initKidsAudio() {
+  // A double-tap on start must not build the graph twice; a failed start may try again
+  initPromise ??= buildGraph().catch(e => { initPromise = null; throw e })
+  return initPromise
+}
+async function buildGraph() {
   // iOS 17+: play through the silent switch, like a music app. Must be set
   // before the AudioContext starts.
   try { if (navigator.audioSession) navigator.audioSession.type = 'playback' } catch (e) {}
@@ -134,7 +137,8 @@ function syncVoice(i) {
     const kitId = VIBE_KITS[s.vibe]
     if (!v || v.instId !== s.inst) { v?.sampler?.dispose(); voices[i] = { instId: s.inst, loaded: loadedKits.size > 0 } }
     if (!loadedKits.has(kitId)) {
-      loadKit(kitId).then(m => { loadedKits.set(kitId, m); markLoaded(i, s.inst) }).catch(() => {})
+      loadKit(kitId).then(m => { loadedKits.set(kitId, m); markLoaded(i, s.inst) })
+        .catch(() => setTimeout(() => { if (slots[i]?.inst === s.inst && !loadedKits.has(kitId)) syncVoice(i) }, 4000))
     } else markLoaded(i, s.inst)
     return
   }
@@ -154,7 +158,12 @@ function syncVoice(i) {
     voices[i].sampler = sampler
     voices[i].pending = false
     markLoaded(i, s.inst)
-  }).catch(() => { if (voices[i]?.instId === s.inst) voices[i].pending = false })   // retried on next change
+  }).catch(() => {
+    if (voices[i]?.instId !== s.inst) return
+    voices[i].pending = false
+    // Network blip: try again on our own, so the icon doesn't pulse "loading" forever
+    setTimeout(() => { if (voices[i]?.instId === s.inst && !voices[i].loaded) syncVoice(i) }, 4000)
+  })
 }
 function markLoaded(i, instId) {
   if (voices[i]?.instId === instId) voices[i].loaded = true
@@ -267,26 +276,35 @@ function scheduleStep(t, now) {
 
   slots.forEach((s, i) => {
     if (!s || s.muted || !voices[i]?.loaded) return
-    const inst = instById(s.inst)
-    const role = inst.role
-    let hit = false
-
-    if (role === 'beat') {
-      hit = playDrums(i, PATTERNS[s.vibe][song.meter].beat, absStep, t)
-    } else {
-      const own = PATTERNS[s.vibe][song.meter][role]
-      // Pads stay sustained — chopping them into gaps sounds broken
-      const complement = i !== li && role !== 'pad' && vibeDistance(s.vibe, leader.vibe) === 3
-      const ev = complement
-        ? complementEvent(own, leader, absStep, role)
-        : patternEvent(own, absStep)
-      if (ev) {
-        playPitched(i, inst, ev, chordDeg, sameRoleRank(i, role), t)
-        hit = true
-      }
+    try {   // one bad slot must never kill the scheduler (the play button would then lie)
+      scheduleSlot(s, i, li, leader, chordDeg, absStep, t, now)
+    } catch (e) {
+      console.warn('kids: skipped slot', i, e)
     }
-    if (hit) at(() => noteListeners.forEach(cb => cb(i)), t, now)
   })
+}
+
+function scheduleSlot(s, i, li, leader, chordDeg, absStep, t, now) {
+  const inst = instById(s.inst)
+  const role = inst.role
+  let hit = false
+
+  if (role === 'beat') {
+    hit = playDrums(i, PATTERNS[s.vibe][song.meter].beat, absStep, t)
+  } else {
+    const own = PATTERNS[s.vibe]?.[song.meter]?.[role]
+    if (!own) return
+    // Pads stay sustained — chopping them into gaps sounds broken
+    const complement = i !== li && role !== 'pad' && vibeDistance(s.vibe, leader.vibe) === 3
+    const ev = complement
+      ? complementEvent(own, leader, absStep, role)
+      : patternEvent(own, absStep)
+    if (ev) {
+      playPitched(i, inst, ev, chordDeg, sameRoleRank(i, role), t)
+      hit = true
+    }
+  }
+  if (hit) at(() => noteListeners.forEach(cb => cb(i)), t, now)
 }
 
 function currentProg(leader) {
@@ -309,7 +327,7 @@ function patternEvent(str, absStep) {
   return { ch, durSteps: dur }
 }
 
-// Complement: play on 8th-note steps where the leader is silent.
+// Complement: play on 8th-note steps where the leader isn't starting a note.
 function complementEvent(own, leader, absStep, role) {
   if (absStep % 2) return null
   if (leaderBusy(leader, absStep)) return null
@@ -329,10 +347,10 @@ function leaderBusy(leader, absStep) {
     const c = (s) => s?.[absStep % s.length]
     return c(pat.k) === 'x' || c(pat.s) === 'x'
   }
+  // Only a new note counts as busy. Counting held notes too left no gaps at all
+  // under legato leaders (trumpet on sunny/chill/dreamy), so the complement went silent.
   const c = pat[absStep % pat.length]
-  if (c === '.') return false
-  if (c === '-') return HOLD_IS_BUSY.has(role)
-  return true
+  return c !== '.' && c !== '-'
 }
 
 function playPitched(i, inst, ev, chordDeg, rank, t) {

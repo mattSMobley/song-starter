@@ -46,7 +46,6 @@ function cleanSong(raw) {
   return s
 }
 
-// Pick a friendly voice when one exists (iPad: Samantha), else the default
 export default function KidsApp() {
   const [age, setAge]           = useState(() => load('kids_age', null))
   const [screen, setScreen]     = useState('gate')       // gate | play
@@ -270,6 +269,9 @@ export default function KidsApp() {
     return (
       <div className={`kids-root ${song.mode}`}>
         <div className="gate">
+          {pickingAge && age && audioOn && (
+            <button className="gate-back" aria-label="back" onClick={() => { setPickingAge(false); setScreen('play') }}>↩</button>
+          )}
           {age && !pickingAge ? (
             <>
               <button className="big-start" onClick={() => begin(null)}>▶</button>
@@ -369,8 +371,9 @@ export default function KidsApp() {
             )}
             {tier.octave && (
               <div className="tray-group">
-                {[[-1, '✕'], [0, '■'], [1, '●']].map(([o, shape]) => (
-                  <button key={o} className={`tray-btn shape ${sel.oct === o ? 'on' : ''}`}
+                {/* low / middle / high, the classic music-class animals */}
+                {[[-1, '🐘', 'low'], [0, '🐱', 'middle'], [1, '🐤', 'high']].map(([o, shape, label]) => (
+                  <button key={o} aria-label={label} className={`tray-btn shape ${sel.oct === o ? 'on' : ''}`}
                     onClick={() => updateSlot(selected, { oct: o })}>{shape}</button>
                 ))}
               </div>
@@ -396,8 +399,8 @@ export default function KidsApp() {
         <button className="tool" aria-label="voice" onClick={() => setVoiceOpen(true)}>
           {voiceOn ? '🗣️' : '🤫'}
         </button>
-        <button className="tool" onClick={() => { setPickingAge(true); setScreen('gate') }}>🎂</button>
-        <HoldButton onHold={() => { engine.stop(); window.location.href = window.location.pathname }}>🏠</HoldButton>
+        <HoldButton label="age" onHold={() => { setPickingAge(true); setScreen('gate') }}>🎂</HoldButton>
+        <HoldButton label="exit" onHold={() => { engine.stop(); window.location.href = window.location.pathname }}>🏠</HoldButton>
       </div>
       </div>
 
@@ -425,14 +428,14 @@ function pulse(el) {
   el.classList.add('hit')
 }
 
-// Grown-up exit: hold 1.5 s (kids tap, grown-ups hold)
-function HoldButton({ onHold, children }) {
+// Grown-up buttons: hold 1.5 s (kids tap, grown-ups hold)
+function HoldButton({ onHold, label, children }) {
   const t = useRef(null)
   const [holding, setHolding] = useState(false)
   const start = () => { setHolding(true); t.current = setTimeout(onHold, 1500) }
   const cancel = () => { setHolding(false); clearTimeout(t.current) }
   return (
-    <button className={`tool hold ${holding ? 'holding' : ''}`}
+    <button className={`tool hold ${holding ? 'holding' : ''}`} aria-label={`hold for ${label}`}
       onPointerDown={start} onPointerUp={cancel} onPointerLeave={cancel} onPointerCancel={cancel}>
       {children}
     </button>

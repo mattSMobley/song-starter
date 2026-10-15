@@ -49,7 +49,13 @@
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 40px;
 }
 .gate-cake { font-size: 96px; animation: bob 2.4s ease-in-out infinite; }
-.balloons { display: flex; flex-wrap: wrap; justify-content: center; gap: 22px; max-width: 760px; }
+.balloons { display: flex; flex-wrap: wrap; justify-content: center; gap: 22px; max-width: 900px; }
+/* All 7 in one row when they fit; otherwise 4 + 3, never a lonely 9+ on its own row */
+@media (max-width: 899px) { .balloons { max-width: 480px; } }
+@media (max-width: 600px) {
+  .balloons { max-width: 340px; gap: 14px; }
+  .balloon { width: 72px !important; height: 88px !important; font-size: 34px !important; }
+}
 .balloon {
   width: 96px; height: 116px;
   border-radius: 50% 50% 48% 48% / 56% 56% 44% 44%;
@@ -71,6 +77,7 @@
   font-size: 84px; padding-left: 16px;
   animation: breathe 1.8s ease-in-out infinite;
 }
+.gate-back { position: absolute; top: max(18px, env(safe-area-inset-top)); left: max(18px, env(safe-area-inset-left)); width: 64px; height: 64px; border-radius: 20px; font-size: 30px; background: var(--panel); }
 .gate-age { font-size: 28px; padding: 10px 22px; border-radius: 999px; background: var(--panel); }
 
 /* ── Song bar ───────────────────────────────────────────────────────────── */
@@ -243,7 +250,7 @@
   background: var(--panel); border: 2px solid var(--panel-edge);
 }
 .tray-btn.on { background: rgba(255,255,255,0.3); border-color: #fff; }
-.tray-btn.shape { font-size: 26px; }
+.tray-btn.shape { font-size: 30px; }
 .tray-btn.trash { background: rgba(239,68,68,0.25); }
 .vol-bar { width: 52px; height: 64px; border-radius: 16px; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 10px; }
 .vol-bar i { display: block; width: 22px; border-radius: 6px; background: rgba(255,255,255,0.35); }
