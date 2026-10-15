@@ -55,14 +55,47 @@ export function keyOffset(letter) {
   return pc > 6 ? pc - 12 : pc
 }
 
+// ── Chords (9+ chord sequencer) ──────────────────────────────────────────────
+// A chord is a scale step 0–5, shown to kids as the number 1–6. Its triad is
+// stacked from the scale, so quality follows the key: in major 1 4 5 are major,
+// 2 3 6 minor; in minor 3 6 are major, 1 4 5 minor, 2 diminished.
+const LETTERS = 'CDEFGAB'
+
+export function chordInfo(keyLetter, mode, deg) {
+  const key = keyByLetter(keyLetter)
+  const letter = LETTERS[(LETTERS.indexOf(key.letter) + deg) % 7]
+  const target = (key.pc + degreeToSemis(deg, mode)) % 12
+  const diff = (target - keyByLetter(letter).pc + 12) % 12
+  const acc = diff === 1 ? '♯' : diff === 11 ? '♭' : diff === 2 ? '𝄪' : diff === 10 ? '𝄫' : ''
+  const third = degreeToSemis(deg + 2, mode) - degreeToSemis(deg, mode)
+  const fifth = degreeToSemis(deg + 4, mode) - degreeToSemis(deg, mode)
+  const quality = third === 4 ? '' : fifth === 6 ? '°' : 'm'
+  return { num: deg + 1, name: letter + acc + quality, letter, color: keyByLetter(letter).color }
+}
+
+// Famous progressions (scale steps). Several match vibe progressions on purpose,
+// so kids discover that "sunny" is the pop progression.
+export const CHORD_PRESETS = [
+  { id: 'pop',    label: 'Pop',     chords: [0, 4, 5, 3] },
+  { id: 'doowop', label: 'Doo-wop', chords: [0, 5, 3, 4] },
+  { id: 'sad',    label: 'Sad pop', chords: [5, 3, 0, 4] },
+  { id: 'rock',   label: 'Rock',    chords: [0, 3, 4, 3] },
+  { id: 'folk',   label: 'Folk',    chords: [0, 3, 0, 4] },
+  { id: 'jazz',   label: 'Jazz',    chords: [1, 4, 0, 0] },
+]
+
+export const isChordList = c => Array.isArray(c) && c.length === 4 && c.every(d => Number.isInteger(d) && d >= 0 && d <= 5)
+
 // ── Age tiers ────────────────────────────────────────────────────────────────
 export const TIERS = {
-  seedling: { slots: 3, bankSize: 8,  keys: false, tempo: false, meter: false, surprise: false, volume: false, octave: false, badges: false },
-  sprout:   { slots: 4, bankSize: 12, keys: true,  tempo: true,  meter: false, surprise: false, volume: true,  octave: false, badges: true },
-  bloom:    { slots: 6, bankSize: 99, keys: true,  tempo: true,  meter: true,  surprise: true,  volume: true,  octave: true,  badges: true },
+  seedling: { slots: 3, bankSize: 8,  keys: false, tempo: false, meter: false, surprise: false, volume: false, octave: false, badges: false, chords: false },
+  sprout:   { slots: 4, bankSize: 12, keys: true,  tempo: true,  meter: false, surprise: false, volume: true,  octave: false, badges: true,  chords: false },
+  bloom:    { slots: 6, bankSize: 99, keys: true,  tempo: true,  meter: true,  surprise: true,  volume: true,  octave: true,  badges: true,  chords: false },
+  canopy:   { slots: 6, bankSize: 99, keys: true,  tempo: true,  meter: true,  surprise: true,  volume: true,  octave: true,  badges: true,  chords: true },
 }
 export function tierForAge(age) {
   if (age <= 4) return 'seedling'
   if (age <= 6) return 'sprout'
-  return 'bloom'
+  if (age <= 8) return 'bloom'
+  return 'canopy'
 }

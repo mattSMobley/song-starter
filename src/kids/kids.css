@@ -293,6 +293,62 @@
 .mr-side i { font-style: normal; font-size: 14px; letter-spacing: -1px; }
 .mr-side.on { opacity: 1; background: rgba(255,255,255,0.2); }
 
+/* ── Chord sequencer (9+) ────────────────────────────────────────────────── */
+.kids-root.with-chords { grid-template-rows: auto auto 1fr auto auto; }
+.chord-strip {
+  position: relative; z-index: 5;
+  display: flex; align-items: center; gap: 14px;
+  padding: 10px 14px; border-radius: 24px;
+  background: var(--panel); border: 2px solid var(--panel-edge);
+}
+.chord-strip.glow { animation: halo 1.4s ease-in-out infinite; }
+.cs-pads { flex: 1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; max-width: 680px; }
+.cs-pad, .cs-tile {
+  position: relative; display: flex; align-items: center; justify-content: center; gap: 10px;
+  border-radius: 18px; color: #fff; text-shadow: 0 2px 0 rgba(0,0,0,0.3);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--chord) 75%, white), var(--chord));
+  box-shadow: 0 5px 0 color-mix(in srgb, var(--chord) 60%, black);
+  transition: transform 0.12s, opacity 0.12s, box-shadow 0.12s;
+}
+.cs-pad { height: 72px; opacity: 0.78; }
+.cs-pad.now {
+  opacity: 1; transform: translateY(-4px);
+  box-shadow: 0 9px 0 color-mix(in srgb, var(--chord) 60%, black), 0 0 0 4px #fff, 0 0 28px var(--chord);
+}
+.cs-pad.sel { opacity: 1; outline: 4px dashed #fff; outline-offset: 4px; }
+.cs-pad:active, .cs-tile:active { transform: translateY(4px); box-shadow: 0 1px 0 color-mix(in srgb, var(--chord) 60%, black); }
+.cs-num { font-size: 36px; line-height: 1; }
+.cs-name { font-size: 18px; line-height: 1; padding: 4px 8px; border-radius: 10px; background: rgba(0,0,0,0.22); }
+.cs-tools { display: flex; gap: 10px; }
+.cs-tool {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  width: 76px; height: 64px; border-radius: 16px;
+  background: var(--panel); border: 3px solid transparent; color: var(--ink); font-size: 24px;
+}
+.cs-tool span { font-size: 13px; opacity: 0.85; }
+.cs-tool.on { border-color: #fff; background: rgba(255,255,255,0.18); }
+.cs-pop {
+  position: absolute; top: calc(100% + 10px); z-index: 15;
+  padding: 12px; border-radius: 22px;
+  background: #241a4f; border: 3px solid var(--panel-edge); box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+}
+.cs-picker { left: 0; display: grid; grid-template-columns: repeat(6, 88px); gap: 10px; }
+.cs-tile { flex-direction: column; gap: 6px; height: 88px; }
+.cs-tile.on { outline: 4px solid #fff; outline-offset: 2px; }
+.cs-presets { right: 0; display: grid; grid-template-columns: repeat(2, minmax(190px, 1fr)); gap: 10px; }
+.cs-preset {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  min-height: 56px; padding: 8px 14px; border-radius: 16px;
+  background: var(--panel); border: 3px solid transparent; color: var(--ink); font-size: 18px;
+}
+.cs-preset.on { border-color: #fff; background: rgba(255,255,255,0.18); }
+.cs-preset-chips { display: flex; gap: 4px; }
+.cs-preset-chips i {
+  display: flex; align-items: center; justify-content: center; width: 26px; height: 26px;
+  border-radius: 8px; background: var(--chord); color: #fff; font-style: normal; font-size: 15px;
+  text-shadow: 0 1px 0 rgba(0,0,0,0.3);
+}
+
 /* ── Voice picker (grown-up) ───────────────────────────────────────────── */
 .voice-card {
   position: relative; width: min(560px, 100%); max-height: 100%; overflow-y: auto;
@@ -482,4 +538,18 @@
   .slot-icon { width: 64px; height: 64px; font-size: 36px; }
   .play-btn { width: 88px; height: 88px; font-size: 38px; }
   .bank-btn { width: 64px; height: 64px; font-size: 36px; border-radius: 18px; }
+}
+
+/* Chord sequencer on phones: pads full width, tools underneath, 3×2 picker */
+@media (max-width: 600px) {
+  .chord-strip { flex-wrap: wrap; gap: 10px; padding: 10px 8px; }
+  .cs-pads { flex-basis: 100%; gap: 6px; }
+  .cs-pad { height: 60px; flex-direction: column; gap: 4px; }
+  .cs-num { font-size: 26px; }
+  .cs-name { font-size: 14px; padding: 2px 6px; }
+  .cs-tools { width: 100%; justify-content: flex-end; }
+  .cs-tool { flex-direction: row; gap: 6px; width: auto; height: 48px; padding: 0 14px; font-size: 20px; }
+  .cs-pop { left: 0; right: 0; }
+  .cs-picker { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .cs-presets { grid-template-columns: 1fr; }
 }

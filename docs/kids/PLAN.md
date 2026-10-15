@@ -73,7 +73,7 @@ Stored locally only. A grown-up can change it behind the parent gate.
 | 🌱 Seedling | 3–4 | 3 | 8 instruments | ☀️/🌙 flip only | mute, remove |
 | 🌿 Sprout | 5–6 | 4 | 12 | + key tiles, + 🐢/🐇 tempo | + loud/quiet |
 | 🌳 Bloom | 7+ | 6 | all | + 3/4 ↔ 4/4 rocker, + 🎲 surprise | + low/mid/high octave |
-| (next phase) 🎛️ | 9+ | 6 | all | + chord sequencer | |
+| 🌲 Canopy | 9+ | 6 | all | + chord sequencer (built 2026-10-15) | |
 | (later, maybe) | 5–8 | | | + simple chord train (2–3 cars, blocks 1/4/5) | |
 
 **Decided 2026-10-14:** 9-year-olds tend to reject anything that looks babyish, so the 9+ tier gets a
@@ -81,7 +81,18 @@ Stored locally only. A grown-up can change it behind the parent gate.
 its chord, or drag numbered tiles onto it. Pads are letter-colored like the key bells and labeled with the
 number and the real chord name ("1 · C", "5 · G"). It also has "famous progression" presets (1-5-6-4 and
 friends). The train metaphor may come back later as a simpler version for 5–8, so the idea grows up with
-the child. Until 9+ has the sequencer, the 7, 8 and 9+ balloons give the same app.
+the child.
+
+**How the sequencer works (as built):**
+- One chord per bar, four pads, looping.
+- **Auto** (🎨, the default) shows the leader vibe's own progression. The pads change as the dial turns, so kids
+  can see that "sunny" is the pop progression.
+- Editing any pad copies the progression and makes it the kid's own. 🎨 Auto goes back to following the dial.
+- The picker hops to the next pad after each pick. Tapping pad 1 then 1·5·6·4 writes a whole progression.
+- While stopped, a pick plays the chord on the best-suited loaded instrument (comp → pad → … → a synth triad),
+  and a preset plays all 4. While playing, the change is heard in the music itself.
+- Chord names are spelled properly (F♯m, B♭, D°). Pad color is the chord root's letter color, matching the key bells.
+- Custom chords are saved in the song and on tapes. They only play for the 9+ tier: a younger age follows the dial.
 
 Tiers are data (`ageTiers.js`), so tuning them is a one-line change.
 
@@ -184,7 +195,7 @@ Kids will max everything, so the limiter is mandatory.
 | 2 — Patterns | Full library: 6 vibes × roles × 2 meters × 2 variants, complement generator tuning | Every dial position on every instrument is a "yes" |
 | 3 — Save + profiles | Emoji names, tape shelf, profiles | |
 | 4 — iPad app | Capacitor shell, audio session, parent gate, icons, TestFlight | Installed on a real iPad |
-| 5 — Chord sequencer (9+) | 4 letter-colored pads, number + chord name, presets; train version for 5–8 later | |
+| 5 — Chord sequencer (9+) | 4 letter-colored pads, number + chord name, presets; train version for 5–8 later | ✅ built 2026-10-15 |
 | 6 — Polish | Recorded voice prompts, haptics, accessibility audit | |
 
 ---

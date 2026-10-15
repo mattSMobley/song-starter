@@ -19,7 +19,7 @@ const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
   (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1)
 
 // ── State ────────────────────────────────────────────────────────────────────
-const song = { key: 'C', mode: 'major', meter: 4, tempoScale: 1 }
+const song = { key: 'C', mode: 'major', meter: 4, tempoScale: 1, chords: null }   // chords: 4 scale steps, or null = leader vibe's
 let pendingMeter = null
 let slots = []                  // [{ inst, vibe, vol, oct, muted } | null]
 const voices = []               // per slot: { instId, sampler, loaded }
@@ -32,8 +32,10 @@ let nextTime = 0, barStep = 0, barIndex = 0
 const noteListeners = new Set()
 const beatListeners = new Set()
 const loadListeners = new Set()
+const barListeners = new Set()
 export const onNote = cb => (noteListeners.add(cb), () => noteListeners.delete(cb))
 export const onBeat = cb => (beatListeners.add(cb), () => beatListeners.delete(cb))
+export const onBar = cb => (barListeners.add(cb), () => barListeners.delete(cb))   // cb(chord index | null)
 export const onLoadChange = cb => (loadListeners.add(cb), () => loadListeners.delete(cb))
 
 // ── Audio graph ──────────────────────────────────────────────────────────────
@@ -205,6 +207,7 @@ export function play() {
 
 export function stop() {
   playing = false
+  barListeners.forEach(cb => cb(null))
   clearTimeout(schedTimer)
   schedTimer = null
   voices.forEach(v => v?.sampler?.releaseAll?.())
@@ -254,9 +257,13 @@ function scheduleStep(t, now) {
   const li = leaderIndex()
   if (li < 0) return
   const leader = slots[li]
-  const prog = VIBES[leader.vibe].prog
+  const prog = currentProg(leader)
   const chordDeg = prog[barIndex % prog.length]
   const absStep = barIndex * spb + barStep
+  if (barStep === 0) {
+    const idx = barIndex % prog.length
+    at(() => playing && barListeners.forEach(cb => cb(idx)), t, now)   // not after a stop
+  }
 
   slots.forEach((s, i) => {
     if (!s || s.muted || !voices[i]?.loaded) return
@@ -280,6 +287,10 @@ function scheduleStep(t, now) {
     }
     if (hit) at(() => noteListeners.forEach(cb => cb(i)), t, now)
   })
+}
+
+function currentProg(leader) {
+  return song.chords ?? VIBES[leader.vibe].prog
 }
 
 // Earlier slots with the same role push this one up an octave (avoids mud)
@@ -414,6 +425,36 @@ export function blip(idx) {
   g.connect(bus.input)
   o.start(t)
   o.stop(t + 0.14)
+}
+
+// Hear a chord while the music is stopped: on the slot best suited to chords,
+// or a soft synth triad when no pitched instrument is loaded yet.
+const PREVIEW_ROLES = ['comp', 'pad', 'riff', 'melody', 'sparkle', 'bass']
+export function previewChord(deg) {
+  if (!ready || playing) return
+  const ctx = Tone.getContext().rawContext
+  const t = ctx.currentTime + 0.02
+  for (const role of PREVIEW_ROLES) {
+    const i = slots.findIndex((s, j) => s && !s.muted && voices[j]?.loaded && instById(s.inst).role === role)
+    if (i >= 0) {
+      playPitched(i, instById(slots[i].inst), { ch: 'x', durSteps: 6 }, deg, 0, t)
+      return
+    }
+  }
+  ;[0, 2, 4].forEach(step => {
+    const midi = 60 + keyOffset(song.key) + degreeToSemis(deg + step, song.mode)
+    const o = ctx.createOscillator()
+    const g = ctx.createGain()
+    o.type = 'triangle'
+    o.frequency.value = 440 * Math.pow(2, (midi - 69) / 12)
+    g.gain.setValueAtTime(0.0001, t)
+    g.gain.exponentialRampToValueAtTime(0.08, t + 0.01)
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.7)
+    o.connect(g)
+    g.connect(bus.input)
+    o.start(t)
+    o.stop(t + 0.75)
+  })
 }
 
 export function boop() {

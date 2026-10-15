@@ -5,14 +5,15 @@ import { INSTRUMENTS, instById } from './instruments.js'
 import { InstIcon } from './InstrumentArt.jsx'
 import VoicePicker from './VoicePicker.jsx'
 import { speak } from './voice.js'
-import { TIERS, tierForAge, VIBES, KEYS } from './theory.js'
+import { TIERS, tierForAge, VIBES, KEYS, isChordList } from './theory.js'
 import VibeDial from './VibeDial.jsx'
 import { ModeFlip, KeyBells, TempoLever, MeterRocker } from './SongControls.jsx'
 import TapeDeck from './TapeDeck.jsx'
+import ChordStrip from './ChordStrip.jsx'
 
 const MAX_SLOTS = 6
 const AGES = [3, 4, 5, 6, 7, 8, 9]
-const DEFAULT_SONG = { key: 'C', mode: 'major', meter: 4, tempoScale: 1 }
+const DEFAULT_SONG = { key: 'C', mode: 'major', meter: 4, tempoScale: 1, chords: null }
 const MAX_TAPES = 40
 // Neutral balloon colors — not letter or vibe colors, so they don't imply a meaning
 const BALLOONS = ['#f9a8d4', '#93c5fd', '#fcd34d', '#a5b4fc', '#86efac', '#fdba74', '#c4b5fd']
@@ -41,6 +42,7 @@ function cleanSong(raw) {
   if (s.mode !== 'minor') s.mode = 'major'
   if (s.meter !== 3) s.meter = 4
   if (!(s.tempoScale > 0.5 && s.tempoScale < 1.5)) s.tempoScale = 1
+  if (!isChordList(s.chords)) s.chords = null
   return s
 }
 
@@ -62,6 +64,8 @@ export default function KidsApp() {
   const [wiggle, setWiggle]     = useState(false)
   const [pickingAge, setPickingAge] = useState(false)
   const [deckOpen, setDeckOpen] = useState(false)
+  const [chordNow, setChordNow] = useState(null)
+  const [chordsTouched, setChordsTouched] = useState(() => load('kids_chords_touched', false))
   const [tapes, setTapes]       = useState(() => (Array.isArray(load('kids_tapes', [])) ? load('kids_tapes', []) : []))
 
   const tier = TIERS[tierForAge(age ?? 5)]
@@ -76,7 +80,8 @@ export default function KidsApp() {
 
   // ── Persist + sync engine ──────────────────────────────────────────────────
   useEffect(() => { save('kids_slots', slots); engine.setSlots(slots.map((s, i) => (i < n ? s : null))) }, [slots, n])
-  useEffect(() => { save('kids_song', song); engine.setSong(song) }, [song])
+  // Custom chords only play for tiers that can see them (a 9+ song loaded at age 5 follows the dial)
+  useEffect(() => { save('kids_song', song); engine.setSong({ ...song, chords: tier.chords ? song.chords : null }) }, [song, tier.chords])
   useEffect(() => { save('kids_touched', [...touched]) }, [touched])
   useEffect(() => { save('kids_tapes', tapes) }, [tapes])
   useEffect(() => engine.onLoadChange(setLoaded), [])
@@ -92,6 +97,7 @@ export default function KidsApp() {
   // Note lights + beat dots: DOM class pulses, no React re-render per note
   useEffect(() => engine.onNote(i => pulse(iconRefs.current[i])), [])
   useEffect(() => engine.onBeat(b => pulse(beatRefs.current[b])), [])
+  useEffect(() => engine.onBar(setChordNow), [])
 
   // ── Spoken prompts (each one once per session) ─────────────────────────────
   const say = useCallback((id, text) => {
@@ -219,6 +225,34 @@ export default function KidsApp() {
     if (fresh.some(Boolean) && !engine.isPlaying()) { engine.play(); setPlaying(true) }
   }
 
+  // ── Chords (9+) ────────────────────────────────────────────────────────────
+  const vibeProg = VIBES[leader ? leader.vibe : 2].prog
+  const chords = song.chords ?? vibeProg
+
+  function chordsFirstUse() {
+    poke()
+    if (chordsTouched) return
+    setChordsTouched(true)
+    save('kids_chords_touched', true)
+    say('chords', 'Pick a number!')
+  }
+
+  function setChord(i, deg) {
+    poke()
+    setSong(s => {
+      const next = [...(s.chords ?? vibeProg)]
+      next[i] = deg
+      return { ...s, chords: next }
+    })
+    engine.previewChord(deg)
+  }
+
+  function setPreset(list) {
+    poke()
+    setSong(s => ({ ...s, chords: [...list] }))
+    list.forEach((d, j) => setTimeout(() => engine.previewChord(d), j * 380))   // only sounds while stopped
+  }
+
   // ── Glow guidance (suggests, never blocks) ─────────────────────────────────
   const filled = active.map((s, i) => (s ? i : -1)).filter(i => i >= 0)
   const untouched = filled.filter(i => !touched.has(active[i].uid))
@@ -229,6 +263,7 @@ export default function KidsApp() {
       ? { dial: untouched[untouched.length - 1] }
       : firstEmpty >= 0 ? { bank: 'soft', slot: firstEmpty } : {}
   if (filled.length >= 2 && !untouched.length && !tapes.length) guide.tape = true
+  if (tier.chords && filled.length >= 2 && !untouched.length && !chordsTouched) guide.chords = true
 
   // ── Screens ────────────────────────────────────────────────────────────────
   if (screen === 'gate') {
@@ -261,7 +296,7 @@ export default function KidsApp() {
   const sel = selected != null ? active[selected] : null
 
   return (
-    <div className={`kids-root ${song.mode}`} onPointerDownCapture={poke}>
+    <div className={`kids-root ${song.mode} ${tier.chords ? 'with-chords' : ''}`} onPointerDownCapture={poke}>
       {/* ── Song bar ── */}
       <header className="song-bar">
         <ModeFlip mode={song.mode} glow={idle && playing}
@@ -270,6 +305,13 @@ export default function KidsApp() {
         {tier.tempo && <TempoLever value={song.tempoScale} onChange={tempoScale => setSong(s => ({ ...s, tempoScale }))} />}
         {tier.surprise && <button className="surprise" onClick={surprise}>🎲</button>}
       </header>
+
+      {tier.chords && (
+        <ChordStrip chords={chords} auto={!song.chords} keyLetter={song.key} mode={song.mode}
+          now={playing ? chordNow : null} glow={guide.chords}
+          onSet={setChord} onPreset={setPreset} onFirstUse={chordsFirstUse}
+          onAuto={() => { poke(); setSong(s => ({ ...s, chords: null })) }} />
+      )}
 
       {/* ── Stage: slots + play ── */}
       <main className="stage">
