@@ -280,10 +280,11 @@
 .bank-btn:active { transform: translateY(6px); box-shadow: 0 1px 0 #8f86ad; }
 
 /* ── Corner tools (grown-up-ish, small) ─────────────────────────────────── */
+/* Two to a row, and an odd one out sits centered under them */
 .corner-tools {
-  flex: none; display: grid; grid-template-columns: repeat(2, 48px); gap: 8px; justify-items: center;
+  flex: none; width: 104px; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px;
 }
-.corner-tools .meter-rocker { grid-column: 1 / -1; }
+.corner-tools .meter-rocker { flex-basis: 100%; justify-content: center; }
 .tool { width: 48px; height: 48px; border-radius: 14px; font-size: 24px; background: var(--panel); opacity: 0.75; }
 .tool.hold { position: relative; overflow: hidden; }
 .tool.hold::after {
@@ -560,14 +561,14 @@
   .slots, .slots.n4, .slots.n6 { --cols: 2; width: 100%; grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); }
   .slots.n3 { --cols: 3; grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .slots.n3 .slot-icon { width: 72px; height: 72px; font-size: 42px; }
-  .play-col { flex-direction: row; gap: 16px; }
+  .play-col { flex-direction: row; justify-content: center; gap: 16px; }
   .play-col .tape-btn { margin-top: 0; }
   .tray { flex-wrap: wrap; gap: 8px; }
   .tray.open { height: auto; padding: 4px 0; }
   .bottom-row { flex-direction: column; align-items: stretch; }
   .bank { flex: none; }
-  .corner-tools { grid-template-columns: repeat(4, 48px); justify-content: end; }
-  .corner-tools .meter-rocker { grid-column: auto / span 1; }
+  .corner-tools { width: auto; }
+  .corner-tools .meter-rocker { flex-basis: auto; }
 }
 
 /* Small screens (phones) — shrink, still usable */

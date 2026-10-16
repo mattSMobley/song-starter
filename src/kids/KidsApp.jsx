@@ -8,7 +8,7 @@ import { speak } from './voice.js'
 import { TIERS, tierForAge, VIBES, KEYS, isChordList } from './theory.js'
 import VibeDial from './VibeDial.jsx'
 import { ModeFlip, KeyBells, TempoLever, MeterRocker } from './SongControls.jsx'
-import TapeDeck from './TapeDeck.jsx'
+import TapeDeck, { STICKERS } from './TapeDeck.jsx'
 import ChordStrip from './ChordStrip.jsx'
 import TapHint from './TapHint.jsx'
 
@@ -28,6 +28,7 @@ function save(key, value) {
 
 let uidSeq = Date.now()
 const newUid = () => ++uidSeq
+const pickStickers = () => [...STICKERS].sort(() => Math.random() - 0.5).slice(0, 3)
 
 // Persisted data may come from an older version — keep only slots we can play
 function cleanSlots(list) {
@@ -121,17 +122,25 @@ export default function KidsApp() {
   useEffect(() => { if (idle) setSelected(null) }, [idle])   // a forgotten selection would turn the next bank tap into a swap
 
   // ── Start / age ────────────────────────────────────────────────────────────
-  // A new song (empty board) always starts on C, happy, 4/4, normal speed, so one
-  // kid's key or 🎲 roll doesn't carry over. A song still on the board keeps its key.
-  function freshSongIfEmpty() {
-    if (!slots.some(Boolean)) setSong({ ...DEFAULT_SONG })
+  // Every visit starts on a clean board in C (happy, 4/4, normal speed), so the
+  // next kid never inherits someone else's song. Nothing is lost: a song still on
+  // the board is slipped onto the 📼 shelf first, unless it's already there.
+  function shelveAndClear() {
+    const board = slots.slice(0, MAX_SLOTS)
+    if (board.some(Boolean)) {
+      const sig = t => JSON.stringify([t.song, t.slots.map(x => x && [x.inst, x.vibe, x.vol, x.oct, x.muted])])
+      const tape = { id: newUid(), stickers: pickStickers(), name: '', song, slots: board.map(x => x && { ...x }), created: Date.now() }
+      if (!tapes.some(t => sig(t) === sig(tape))) setTapes(prev => [tape, ...prev].slice(0, MAX_TAPES))
+    }
+    setSlots(Array(MAX_SLOTS).fill(null))
+    setSong({ ...DEFAULT_SONG })
+    setSelected(null)
   }
 
   async function begin(pickedAge) {
     const init = engine.initKidsAudio()   // must start inside the tap (iOS)
-    const resume = active.some(Boolean)
-    freshSongIfEmpty()
-    if (!resume) say('pick', 'Pick an instrument!')   // iOS only allows speech inside the tap too
+    shelveAndClear()
+    say('pick', 'Pick an instrument!')   // iOS only allows speech inside the tap too
     if (pickedAge) {
       setAge(pickedAge)
       save('kids_age', pickedAge)
@@ -142,7 +151,6 @@ export default function KidsApp() {
     if (pickedAge) for (let k = 0; k < pickedAge; k++) setTimeout(() => engine.blip(k), 140 * k)
     setScreen('play')
     poke()
-    if (resume) { engine.play(); setPlaying(true) }
   }
 
   function pickAge(a) {
@@ -150,7 +158,7 @@ export default function KidsApp() {
     if (!audioOn) return begin(a)
     setAge(a)
     save('kids_age', a)
-    freshSongIfEmpty()
+    if (!slots.some(Boolean)) setSong({ ...DEFAULT_SONG })
     for (let k = 0; k < a; k++) setTimeout(() => engine.blip(k), 140 * k)
     setScreen('play')
   }

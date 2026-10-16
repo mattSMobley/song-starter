@@ -64,7 +64,7 @@ If the leader is removed, the crown hops to the next slot.
 
 ## 4. Age tiers
 
-Every visit opens on "How old are you?" (cake + the words, for pre-readers and early readers) with big number balloons (3 4 5 6 7 8 9+). Last time's balloon glows, and picking an age resumes the saved song.
+Every visit opens on "How old are you?" (cake + the words, for pre-readers and early readers) with big number balloons (3 4 5 6 7 8 9+). Last time's balloon glows. Picking an age always starts a clean, silent board in C; whatever was left on the board is slipped onto the 📼 shelf first (with random stickers, skipped if that song is already there), so nothing is lost and no kid inherits someone else's song. Changing age mid-session (hold 🎂) keeps the board.
 Tapping one pops that many balloons with that many notes, so kids count along.
 Stored locally only. A grown-up can change it behind the parent gate.
 
@@ -262,6 +262,8 @@ Kids will max everything, so the limiter is mandatory.
 | 42 | 🎂 in-app was one tap from changing the whole app; no way back from the age screen | 🎂 is hold-to-open like 🏠; ↩ returns without changing anything |
 | 44 | Idle "Happy… or sad?" came out of nowhere | Removed; speech only follows the kid's own action, once per device; the silent 👆 hand replaces idle prompts |
 | 45 | A previous kid's key / 🎲 roll carried into a new song | Empty board → new song starts on C, happy, 4/4, normal speed; a song still on the board keeps its key |
+| 46 | Picking an age on a return visit auto-played the last session's song | New visit = clean board, not playing; the old board goes to the 📼 shelf |
+| 47 | Phone: 🗣️🎂🏠 row and play row sat off-center (4-column grid pushed right) | Both rows centered at every width; on iPad an odd tool sits centered under the pair |
 | 43 | Double-tap on start built the audio graph twice; a failed download left an icon pulsing forever | Start is idempotent; failed instrument / drum loads retry on their own |
 
 **Saving (Phase 3, pulled forward):** 📼 opens the Tape Deck. Kids name a song with up to 3 stickers (plus an optional grown-up text name). Tapes are colored by key and show ☀️/🌙. Tap a tape to load it; hold 🗑️ for 1 s to delete. The 📼 glows once a song is built and nothing has been saved. Stored locally (max 40).
